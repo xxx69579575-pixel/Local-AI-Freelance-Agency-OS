@@ -166,3 +166,143 @@
 [2026-03-22T07:27:42.267Z] Playing notification sound: C:/Windows/Media/chimes.wav
 [2026-03-22T07:27:46.694Z] Notification sound played successfully
 [2026-03-22T07:27:46.695Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T08:16:26.188Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T08:16:26.190Z] Notification hook input received: {
+  "session_id": "6a2cc354-0805-47ca-bf96-ed0082039d1d",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\6a2cc354-0805-47ca-bf96-ed0082039d1d.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude Code login successful",
+  "notification_type": "auth_success"
+}
+[2026-03-22T08:16:26.190Z] Notification type: auth_success
+[2026-03-22T08:16:26.191Z] Message: Claude Code login successful
+[2026-03-22T08:16:26.191Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T08:16:30.694Z] Notification sound played successfully
+[2026-03-22T08:16:30.695Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T08:28:41.218Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T08:28:41.221Z] Notification hook input received: {
+  "session_id": "adc774a8-8b83-4c98-ad10-a26a639c8897",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\adc774a8-8b83-4c98-ad10-a26a639c8897.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude is waiting for your input",
+  "notification_type": "idle_prompt"
+}
+[2026-03-22T08:28:41.221Z] Notification type: idle_prompt
+[2026-03-22T08:28:41.222Z] Message: Claude is waiting for your input
+[2026-03-22T08:28:41.223Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T08:28:45.669Z] Notification sound played successfully
+[2026-03-22T08:28:45.671Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T08:33:44.483Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T08:33:44.487Z] Notification hook input received: {
+  "session_id": "adc774a8-8b83-4c98-ad10-a26a639c8897",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\adc774a8-8b83-4c98-ad10-a26a639c8897.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude is waiting for your input",
+  "notification_type": "idle_prompt"
+}
+[2026-03-22T08:33:44.487Z] Notification type: idle_prompt
+[2026-03-22T08:33:44.487Z] Message: Claude is waiting for your input
+[2026-03-22T08:33:44.487Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T08:33:48.931Z] Notification sound played successfully
+[2026-03-22T08:33:48.931Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T08:36:48.650Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T08:36:48.654Z] Notification hook input received: {
+  "session_id": "adc774a8-8b83-4c98-ad10-a26a639c8897",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\adc774a8-8b83-4c98-ad10-a26a639c8897.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude is waiting for your input",
+  "notification_type": "idle_prompt"
+}
+[2026-03-22T08:36:48.654Z] Notification type: idle_prompt
+[2026-03-22T08:36:48.654Z] Message: Claude is waiting for your input
+[2026-03-22T08:36:48.654Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T08:36:53.082Z] Notification sound played successfully
+[2026-03-22T08:36:53.082Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T08:39:00.488Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T08:39:00.493Z] Notification hook input received: {
+  "session_id": "adc774a8-8b83-4c98-ad10-a26a639c8897",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\adc774a8-8b83-4c98-ad10-a26a639c8897.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude is waiting for your input",
+  "notification_type": "idle_prompt"
+}
+[2026-03-22T08:39:00.493Z] Notification type: idle_prompt
+[2026-03-22T08:39:00.494Z] Message: Claude is waiting for your input
+[2026-03-22T08:39:00.494Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T08:39:04.905Z] Notification sound played successfully
+[2026-03-22T08:39:04.906Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T08:49:56.494Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T08:49:56.497Z] Notification hook input received: {
+  "session_id": "adc774a8-8b83-4c98-ad10-a26a639c8897",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\adc774a8-8b83-4c98-ad10-a26a639c8897.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude is waiting for your input",
+  "notification_type": "idle_prompt"
+}
+[2026-03-22T08:49:56.497Z] Notification type: idle_prompt
+[2026-03-22T08:49:56.497Z] Message: Claude is waiting for your input
+[2026-03-22T08:49:56.497Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T08:50:00.956Z] Notification sound played successfully
+[2026-03-22T08:50:00.957Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T09:14:51.141Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T09:14:51.144Z] Notification hook input received: {
+  "session_id": "adc774a8-8b83-4c98-ad10-a26a639c8897",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\adc774a8-8b83-4c98-ad10-a26a639c8897.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude needs your permission to use Read",
+  "notification_type": "permission_prompt"
+}
+[2026-03-22T09:14:51.145Z] Notification type: permission_prompt
+[2026-03-22T09:14:51.145Z] Message: Claude needs your permission to use Read
+[2026-03-22T09:14:51.145Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T09:14:55.620Z] Notification sound played successfully
+[2026-03-22T09:14:55.620Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T09:19:32.250Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T09:19:32.253Z] Notification hook input received: {
+  "session_id": "adc774a8-8b83-4c98-ad10-a26a639c8897",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\adc774a8-8b83-4c98-ad10-a26a639c8897.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude needs your permission to use Update",
+  "notification_type": "permission_prompt"
+}
+[2026-03-22T09:19:32.253Z] Notification type: permission_prompt
+[2026-03-22T09:19:32.253Z] Message: Claude needs your permission to use Update
+[2026-03-22T09:19:32.253Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T09:19:36.717Z] Notification sound played successfully
+[2026-03-22T09:19:36.718Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T09:21:04.605Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T09:21:04.608Z] Notification hook input received: {
+  "session_id": "adc774a8-8b83-4c98-ad10-a26a639c8897",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\adc774a8-8b83-4c98-ad10-a26a639c8897.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude is waiting for your input",
+  "notification_type": "idle_prompt"
+}
+[2026-03-22T09:21:04.608Z] Notification type: idle_prompt
+[2026-03-22T09:21:04.608Z] Message: Claude is waiting for your input
+[2026-03-22T09:21:04.608Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T09:21:09.022Z] Notification sound played successfully
+[2026-03-22T09:21:09.023Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T09:25:27.416Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T09:25:27.419Z] Notification hook input received: {
+  "session_id": "adc774a8-8b83-4c98-ad10-a26a639c8897",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\adc774a8-8b83-4c98-ad10-a26a639c8897.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude needs your permission to use Bash",
+  "notification_type": "permission_prompt"
+}
+[2026-03-22T09:25:27.419Z] Notification type: permission_prompt
+[2026-03-22T09:25:27.420Z] Message: Claude needs your permission to use Bash
+[2026-03-22T09:25:27.420Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T09:25:31.845Z] Notification sound played successfully
+[2026-03-22T09:25:31.846Z] === NOTIFICATION HOOK COMPLETED ===

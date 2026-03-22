@@ -4,7 +4,12 @@
       "Bash(bash /tmp/worker--alias-list.sh)",
       "Bash(bash /tmp/monitor--alias-list.sh)",
       "Bash(bash /tmp/worker--dev-roadmap.sh)",
-      "Bash(bash /tmp/monitor--dev-roadmap.sh)"
+      "Bash(bash /tmp/monitor--dev-roadmap.sh)",
+      "Bash(bash /tmp/worker--docker-compose-setup.sh)",
+      "Bash(bash /tmp/worker--postgres-schema.sh)",
+      "Bash(bash /tmp/monitor--docker-compose-setup.sh)",
+      "Bash(bash /tmp/monitor--postgres-schema.sh)",
+      "Bash(git add:*)"
     ]
   }
 }

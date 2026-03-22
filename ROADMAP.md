@@ -1,141 +1,82 @@
 # Local AI Freelance Agency OS — 開發路線圖
 
-> **進度摘要：21 / 23 里程碑完成**
->
-> 最後更新：2026-03-22 | 方法論：SDD（規格驅動開發）
+> **進度摘要：0 / 28 里程碑完成**
+> 最後更新：2026-03-22
 
 ---
 
-## 如何自動更新此文件
+## Phase 1 MVP：接案監控核心
 
-每完成一個里程碑：
-1. 將對應的 `- [ ]` 改為 `- [x]`
-2. 更新頂部的「進度摘要」數字（例如 `3 / 23 里程碑完成`）
-3. 執行 `/dispatch "update-push: 更新 ROADMAP.md 進度"` 推送至 GitHub
+**目標**：能自動抓案件、AI 評分、Telegram 通知、人工決策、Kanban 追蹤。
 
-或直接執行：`/dispatch "summarize"` — 讓 dispatch worker 自動掃描所有文件並更新進度摘要。
-
----
-
-## Phase 0：環境設置（Environment Setup）
-
-**目標**：確保開發環境完整，所有工具、指令、版本控制皆就緒。
-
-- [x] **0.1** 確認 `.mcp.json` 已掛載通用 MCP 工具（context7、playwright、icon-generator）
-  → `/dispatch "init-env"`
-- [x] **0.2** 確認 `.claude/commands/` 已載入三個 slash commands（`deploy_vercel.md`、`depoly_github_page.md`、`update.md`）
-  → `/dispatch "load-commands"`
-- [x] **0.3** 確認 git 已初始化，`user.name="dev"`，`user.email="dev@example.com"`，並完成 first commit
-  → `/dispatch "init-git"` → `/dispatch "first-commit"`
+- [ ] **1.1** 建立 Docker Compose 骨架（n8n + Ollama + PostgreSQL + Redis + Telegram Bot）
+- [ ] **1.2** 設計並建立 PostgreSQL schema（leads、projects、kanban_status、agent_logs）
+- [ ] **1.3** 撰寫 PRD 與系統架構文件（`docs/PRD.md`、`docs/architecture.md`）
+- [ ] **1.4** 撰寫 n8n workflow MVP 規格書（`docs/n8n-workflow-spec.md`）
+- [ ] **1.5** 實作 Playwright 爬蟲服務，抓取公開案件列表（PRO360 / 出任務）
+- [ ] **1.6** 實作 Ollama 評分服務（risk_score / fit_score / profit_score）
+- [ ] **1.7** 建立 n8n 工作流：Scheduler → 爬蟲 → 評分 → 寫入 PostgreSQL
+- [ ] **1.8** 實作 Telegram Bot：發送案件摘要通知
+- [ ] **1.9** Telegram Bot 接收回覆：`聯絡報價 / 放棄報價 / 稍後處理`
+- [ ] **1.10** 建立基本 Kanban 看板（案件狀態流轉）
 
 ---
 
-## Phase 1：客戶需求訪談與規格（Client Intake & Spec）
+## Phase 2：報價與成案
 
-**目標**：依 SDD 流程，在寫任何程式碼之前，先將需求轉化為可測試的規格文件。
+**目標**：AI 草擬報價、人工審核、成案後自動建立專案資料夾。
 
-- [x] **1.1** 訪談分析客戶需求，整理 MVP 功能清單與技術風險，輸出至 `docs/intake/`
-  → `/dispatch "intake: [描述客戶需求或貼上需求文件]"`
-- [x] **1.2** 依需求摘要撰寫完整功能規格（含使用者故事、技術規格、驗收標準），輸出至 `docs/specs/`
-  → `/dispatch "write-spec: [指定功能名稱]"`
-- [x] **1.3** 從實作者角度審查規格文件，標注模糊或矛盾之處，輸出至 `docs/specs/review/`
-  → `/dispatch "review-spec"`
-- [x] **1.4** 根據審查意見修訂規格，加上版本號與 changelog，確保所有審查問題已解決
-  → `/dispatch "update-spec"`
+- [ ] **2.1** 實作 Quotation Assistant（Ollama 生成報價草稿）
+- [ ] **2.2** Telegram 發送草稿 + 人工核准流程
+- [ ] **2.3** 實作 Project Bootstrapper：成案後自動建立 `/projects/{id}-{slug}/`
+- [ ] **2.4** 自動產生專案文件：`README.md`、`brief.md`、`scope.md`、`todo.md`、`client-log.md`
+- [ ] **2.5** 建立「交付任務」並發送給 Claude Code / Codex
 
 ---
 
-## Phase 2：開發實作（Development）
+## Phase 3：開發執行與驗收
 
-**目標**：嚴格依照規格實作功能，不超出規格範圍，保持程式碼品質。
+**目標**：Dev Agent 執行開發，客戶回饋轉成修改任務。
 
-- [x] **2.1** 依 `docs/specs/` 規格實作核心功能（Agency OS 主體架構）
-  → `/dispatch "implement: [指定規格檔案路徑]"`
-- [x] **2.2** 實作客戶需求訪談模組（intake form / 需求收集介面）
-  → `/dispatch "add-feature: 客戶需求訪談模組，參考 docs/specs/intake.md"`
-- [x] **2.3** 實作任務派遣與追蹤模組（對應 /dispatch 工作流）
-  → `/dispatch "add-feature: 任務派遣追蹤模組，參考 docs/specs/dispatch.md"`
-- [x] **2.4** 撰寫各功能模組的單元測試與整合測試
-  → `/dispatch "write-tests"`
-- [x] **2.5** 修復開發過程中發現的 bug（118/118 測試通過，無需修復）
-  → `/dispatch "fix-bug: [描述 bug 或貼上錯誤訊息]"`
+- [ ] **3.1** 實作 Dev Agent Dispatcher（將 brief.md 轉發給 Claude Code / Codex）
+- [ ] **3.2** 實作 Revision Manager（客戶回饋 → revision-NNN.md）
+- [ ] **3.3** Claude Code / Codex 依 md 執行修正
+- [ ] **3.4** 修正完成後通知客戶確認流程
 
 ---
 
-## Phase 3：審查與品質確保（Review & QA）
+## Phase 4：Agent 控制面板
 
-**目標**：確保實作符合規格、安全無虞、測試全部通過。
+**目標**：統一監控所有 agent 狀態與 KPI。
 
-- [x] **3.1** 執行完整程式碼審查（正確性、安全性、效能、規格符合度），輸出至 `docs/reviews/`
-  → `/dispatch "code-review"`
-- [x] **3.2** 逐條對照驗收標準執行 QA 檢查，輸出 pass/fail 報告至 `docs/qa/`
-  → `/dispatch "qa-check"`
-- [x] **3.3** 執行測試套件，確認所有測試通過
-  → `/dispatch "run-tests"`
-- [x] **3.4** 執行安全審計（OWASP Top 10、依賴漏洞、API 認證），輸出至 `docs/security/`
-  → `/dispatch "security-audit"`
+- [ ] **4.1** 實作 Agent Runtime Status 面板（n8n / Ollama / Telegram / Claude Code 狀態）
+- [ ] **4.2** Human Approval Queue（待確認項目列表）
+- [ ] **4.3** KPI 區塊（新案件數、推薦數、報價數、成交數、轉換率）
+- [ ] **4.4** 整合 Paperclip 作為 agent 任務治理層
 
 ---
 
-## Phase 4：部署（Deployment）
+## Phase 5：強化與擴充
 
-**目標**：將專案成功部署至生產環境，確認服務正常運作。
+**目標**：安全強化、多平台、半自動客戶溝通。
 
-- [x] **4.1** 執行 build 確認無錯誤後，推送所有變更至 GitHub
-  → `/dispatch "build-check"` → `/dispatch "update-push"`
-- [x] **4.2** 部署至 Vercel（主要生產環境），確認部署 URL 可正常存取
-  → 🚀 https://local-ai-agency-os.vercel.app
-- [x] **4.3** （選用）部署靜態展示頁面至 GitHub Pages
-  → [skip] 純後端專案，不適用
-
----
-
-## Phase 5：迭代與維護（Iteration & Maintenance）
-
-**目標**：持續追蹤進度、回應新需求、保持文件與程式碼同步。
-
-- [x] **5.1** 生成專案進度摘要，包含已完成功能、待處理問題、下一步行動
-  → `docs/progress/2026-03-22-summary.md`
-- [ ] **5.2** 根據使用者反饋或新需求，補充/修訂規格文件，進入下一輪 SDD 循環
-  → `/dispatch "intake: [新需求描述]"` → `/dispatch "write-spec"`
-- [ ] **5.3** 針對已上線功能進行重構，提升可維護性（不改變外部行為）
-  → `/dispatch "refactor: [指定重構範圍]"`
-- [x] **5.4** 更新 README、API 文件，確保文件與最新實作一致
-  → `docs/api.md` + README.md 已更新
+- [ ] **5.1** 防爬蟲偵測強化（User-Agent 輪換、請求節奏控制）
+- [ ] **5.2** 多平台擴充（104外包網、Upwork 等公開頁）
+- [ ] **5.3** 半自動客戶溝通（AI 草擬 → 人工確認 → 送出）
+- [ ] **5.4** SLA 追蹤與版本管理
+- [ ] **5.5** CRM 與知識庫（過往案件學習）
+- [ ] **5.6** 成本追蹤（Ollama token / API 費用）
 
 ---
 
-## 快速參考：Dispatch Alias 一覽
+## Kanban 案件狀態流
 
-| Alias | 模型 | 用途 |
-|---|---|---|
-| `init-env` | sonnet | 環境初始化（MCP + commands + git）|
-| `init-git` | haiku | git 設定 |
-| `first-commit` | haiku | 初始 commit |
-| `load-commands` | haiku | 載入 slash commands |
-| `intake` | opus | 客戶需求訪談分析 |
-| `write-spec` | opus | 撰寫功能規格文件 |
-| `review-spec` | sonnet | 審查規格文件 |
-| `update-spec` | sonnet | 修訂規格文件 |
-| `implement` | sonnet | 依規格實作功能 |
-| `add-feature` | sonnet | 新增功能 |
-| `fix-bug` | sonnet | 修復 bug |
-| `debug` | sonnet | 系統性診斷問題 |
-| `write-tests` | sonnet | 撰寫測試 |
-| `refactor` | opus | 重構程式碼 |
-| `code-review` | opus | 程式碼審查 |
-| `qa-check` | sonnet | QA 驗收檢查 |
-| `run-tests` | haiku | 執行測試套件 |
-| `security-audit` | opus | 安全審計 |
-| `build-check` | haiku | build 確認 |
-| `deploy-vercel` | sonnet | 部署至 Vercel |
-| `deploy-pages` | sonnet | 部署至 GitHub Pages |
-| `update-push` | haiku | commit + push + 觸發部署 |
-| `summarize` | sonnet | 生成進度摘要 |
-| `docs-update` | sonnet | 更新文件 |
-| `status` | haiku | 回報專案現況 |
-| `estimate` | opus | 任務複雜度估算 |
-
----
-
-*此文件由 `/dispatch "dev-roadmap"` 自動生成。每個里程碑完成後請手動勾選，或執行 `/dispatch "summarize"` 更新進度。*
+```
+新抓到 → AI評估中 → 待你決策 → [已放棄]
+                              ↓
+                           待報價 → 已送報價 → 商談中 → [放棄洽談]
+                                                      ↓
+                                                   已成交 → 開發中 → 待初審
+                                                                      ↓
+                                                                 待修正 → 待最終確認 → 已結案
+```
