@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash /tmp/worker--alias-list.sh)",
+      "Bash(bash /tmp/monitor--alias-list.sh)",
+      "Bash(bash /tmp/worker--dev-roadmap.sh)",
+      "Bash(bash /tmp/monitor--dev-roadmap.sh)"
+    ]
+  }
+}
