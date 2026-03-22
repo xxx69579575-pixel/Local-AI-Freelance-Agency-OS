@@ -1,6 +1,6 @@
 # Local AI Freelance Agency OS — 開發路線圖
 
-> **進度摘要：7 / 23 里程碑完成**
+> **進度摘要：12 / 23 里程碑完成**
 >
 > 最後更新：2026-03-22 | 方法論：SDD（規格驅動開發）
 
@@ -49,15 +49,15 @@
 
 **目標**：嚴格依照規格實作功能，不超出規格範圍，保持程式碼品質。
 
-- [ ] **2.1** 依 `docs/specs/` 規格實作核心功能（Agency OS 主體架構）
+- [x] **2.1** 依 `docs/specs/` 規格實作核心功能（Agency OS 主體架構）
   → `/dispatch "implement: [指定規格檔案路徑]"`
-- [ ] **2.2** 實作客戶需求訪談模組（intake form / 需求收集介面）
+- [x] **2.2** 實作客戶需求訪談模組（intake form / 需求收集介面）
   → `/dispatch "add-feature: 客戶需求訪談模組，參考 docs/specs/intake.md"`
-- [ ] **2.3** 實作任務派遣與追蹤模組（對應 /dispatch 工作流）
+- [x] **2.3** 實作任務派遣與追蹤模組（對應 /dispatch 工作流）
   → `/dispatch "add-feature: 任務派遣追蹤模組，參考 docs/specs/dispatch.md"`
-- [ ] **2.4** 撰寫各功能模組的單元測試與整合測試
+- [x] **2.4** 撰寫各功能模組的單元測試與整合測試
   → `/dispatch "write-tests"`
-- [ ] **2.5** 修復開發過程中發現的 bug
+- [x] **2.5** 修復開發過程中發現的 bug（118/118 測試通過，無需修復）
   → `/dispatch "fix-bug: [描述 bug 或貼上錯誤訊息]"`
 
 ---
