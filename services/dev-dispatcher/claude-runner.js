@@ -5,6 +5,27 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 
+const PAPERCLIP_URL = process.env.PAPERCLIP_URL || 'http://paperclip:3008';
+
+function paperclipPatchStatus(taskId, status) {
+  if (!taskId) return;
+  const body = JSON.stringify({ status });
+  const url = new URL(`/task/${taskId}/status`, PAPERCLIP_URL);
+  const req = http.request(
+    {
+      hostname: url.hostname,
+      port: url.port || 80,
+      path: url.pathname,
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    },
+    () => {}
+  );
+  req.on('error', (e) => console.warn(`[claude-runner] paperclip PATCH error: ${e.message}`));
+  req.write(body);
+  req.end();
+}
+
 /**
  * Run `claude --print` with the contents of {projectPath}/.dispatch/task.md as prompt.
  * Captures stdout → {projectPath}/.dispatch/output.md
@@ -13,7 +34,7 @@ const http = require('http');
  * @param {string} projectPath  absolute path to the project workspace
  * @param {number} projectId    DB project id
  */
-function runClaudeTask(projectPath, projectId) {
+function runClaudeTask(projectPath, projectId, paperclipTaskId) {
   const taskFile = path.join(projectPath, '.dispatch', 'task.md');
   const outputFile = path.join(projectPath, '.dispatch', 'output.md');
 
@@ -32,6 +53,8 @@ function runClaudeTask(projectPath, projectId) {
     env: { ...process.env },
     shell: false,
   });
+
+  paperclipPatchStatus(paperclipTaskId, 'running');
 
   child.stdin.write(prompt);
   child.stdin.end();

@@ -11,6 +11,43 @@ const { Pool } = require('pg');
 const PORT = process.env.PORT || 3007;
 const PROJECTS_ROOT = process.env.PROJECTS_ROOT || '/projects';
 const DEV_DISPATCHER_URL = process.env.DEV_DISPATCHER_URL || 'http://dev-dispatcher:3006';
+const PAPERCLIP_URL = process.env.PAPERCLIP_URL || 'http://paperclip:3008';
+
+// ---------------------------------------------------------------------------
+// Paperclip helper — fire-and-forget
+// ---------------------------------------------------------------------------
+function paperclipRequest(method, urlPath, body) {
+  return new Promise((resolve) => {
+    const url = new URL(urlPath, PAPERCLIP_URL);
+    const payload = JSON.stringify(body);
+    const req = http.request(
+      {
+        hostname: url.hostname,
+        port: url.port || 80,
+        path: url.pathname,
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (c) => (data += c));
+        res.on('end', () => {
+          try { resolve(JSON.parse(data)); }
+          catch { resolve(null); }
+        });
+      }
+    );
+    req.on('error', (e) => {
+      console.warn(`[revision-manager] paperclip ${method} error: ${e.message}`);
+      resolve(null);
+    });
+    req.write(payload);
+    req.end();
+  });
+}
 
 const pool = new Pool({
   connectionString: process.env.DB_URL,
@@ -201,6 +238,22 @@ app.post('/revision', async (req, res) => {
         }),
       ]
     );
+
+    // 4b. Register revision task in Paperclip (fire-and-forget)
+    const pcTask = await paperclipRequest('POST', '/task', {
+      project_id: id,
+      agent_name: 'revision-manager',
+      action: 'revision_created',
+      payload: {
+        revision_num: revisionNum,
+        revision_file: revisionFilePath,
+        action_items_count: actionItems.length,
+      },
+    });
+    if (pcTask && pcTask.id) {
+      // Mark as dispatched immediately (revision file is written, dispatch is next)
+      paperclipRequest('PATCH', `/task/${pcTask.id}/status`, { status: 'dispatched' }).catch(() => {});
+    }
 
     // 5. Call dev-dispatcher
     let dispatchResult;

@@ -5,12 +5,62 @@ require('dotenv').config();
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 const { Pool } = require('pg');
 const { generateTaskInstruction } = require('./task-template');
 const { runClaudeTask } = require('./claude-runner');
 
 const PORT = process.env.PORT || 3006;
 const PROJECTS_ROOT = process.env.PROJECTS_ROOT || '/projects';
+const PAPERCLIP_URL = process.env.PAPERCLIP_URL || 'http://paperclip:3008';
+
+// ---------------------------------------------------------------------------
+// Paperclip helpers — fire-and-forget; errors are logged but never thrown
+// ---------------------------------------------------------------------------
+function paperclipRequest(method, urlPath, body) {
+  return new Promise((resolve) => {
+    const url = new URL(urlPath, PAPERCLIP_URL);
+    const payload = body ? JSON.stringify(body) : undefined;
+    const options = {
+      hostname: url.hostname,
+      port: url.port || 80,
+      path: url.pathname + url.search,
+      method,
+      headers: { 'Content-Type': 'application/json' },
+    };
+    if (payload) options.headers['Content-Length'] = Buffer.byteLength(payload);
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => {
+        try { resolve({ statusCode: res.statusCode, body: JSON.parse(data) }); }
+        catch { resolve({ statusCode: res.statusCode, body: data }); }
+      });
+    });
+    req.on('error', (e) => {
+      console.warn(`[paperclip] ${method} ${urlPath} error: ${e.message}`);
+      resolve(null);
+    });
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+async function paperclipCreateTask(projectId, agentName, action, payload) {
+  const result = await paperclipRequest('POST', '/task', {
+    project_id: projectId,
+    agent_name: agentName,
+    action,
+    payload,
+  });
+  return result && result.statusCode === 201 ? result.body.id : null;
+}
+
+async function paperclipUpdateStatus(taskId, status) {
+  if (!taskId) return;
+  await paperclipRequest('PATCH', `/task/${taskId}/status`, { status });
+}
 
 const pool = new Pool({
   connectionString: process.env.DB_URL,
@@ -108,17 +158,27 @@ app.post('/dispatch', async (req, res) => {
       ]
     );
 
+    // 4b. Register task in Paperclip (fire-and-forget; non-blocking)
+    const paperclipTaskId = await paperclipCreateTask(project.id, 'claude-code', 'dispatch', {
+      task_file: taskFilePath,
+      dispatched_at: dispatchedAt,
+    });
+    if (paperclipTaskId) {
+      await paperclipUpdateStatus(paperclipTaskId, 'dispatched');
+    }
+
     // 5. Respond
     res.json({
       dispatched: true,
       project_id: project.id,
       task_file: taskFilePath,
       dispatched_at: dispatchedAt,
+      paperclip_task_id: paperclipTaskId,
       note: 'Claude runner started asynchronously.',
     });
 
     // 6. Async: spawn claude --print against the task file
-    setImmediate(() => runClaudeTask(workspacePath, project.id));
+    setImmediate(() => runClaudeTask(workspacePath, project.id, paperclipTaskId));
     return;
   } catch (err) {
     console.error('[dispatch] error:', err);
@@ -247,6 +307,24 @@ app.post('/complete', async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    // Update the most recent running/dispatched Paperclip task for this project
+    const pcRes = await paperclipRequest(
+      'GET',
+      `/tasks?project_id=${id}&status=running`
+    );
+    if (pcRes && pcRes.body && pcRes.body.tasks && pcRes.body.tasks.length > 0) {
+      await paperclipUpdateStatus(pcRes.body.tasks[0].id, 'completed');
+    } else {
+      // Try dispatched (claude never reported running)
+      const pcRes2 = await paperclipRequest(
+        'GET',
+        `/tasks?project_id=${id}&status=dispatched`
+      );
+      if (pcRes2 && pcRes2.body && pcRes2.body.tasks && pcRes2.body.tasks.length > 0) {
+        await paperclipUpdateStatus(pcRes2.body.tasks[0].id, 'completed');
+      }
+    }
 
     return res.json({
       completed: true,

@@ -187,6 +187,45 @@
     .col-pending_final .column-header { border-top: 3px solid #8b5cf6; border-radius: 10px 10px 0 0; }
     .col-closed     .column-header { border-top: 3px solid #475569; border-radius: 10px 10px 0 0; }
 
+    /* KPI Block */
+    #kpi-block {
+      display: flex;
+      gap: 12px;
+      padding: 16px 24px 0;
+      flex-wrap: wrap;
+    }
+
+    .kpi-card {
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 10px;
+      padding: 14px 20px;
+      min-width: 140px;
+      flex: 1;
+    }
+
+    .kpi-card-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+
+    .kpi-card-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #e2e8f0;
+      line-height: 1;
+    }
+
+    .kpi-card-value.accent-purple { color: #a78bfa; }
+    .kpi-card-value.accent-green  { color: #4ade80; }
+    .kpi-card-value.accent-cyan   { color: #22d3ee; }
+    .kpi-card-value.accent-yellow { color: #facc15; }
+    .kpi-card-value.accent-orange { color: #fb923c; }
+
     #loading {
       position: fixed;
       top: 50%;
@@ -195,18 +234,120 @@
       color: #64748b;
       font-size: 14px;
     }
+
+    /* Agent Status Panel */
+    #agent-status-panel {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 10px 24px;
+      background: #13161f;
+      border-bottom: 1px solid #2d3148;
+    }
+
+    .agent-status-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    .agent-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .agent-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #1a1d27;
+      border: 1px solid #2d3148;
+      border-radius: 20px;
+      padding: 3px 10px 3px 7px;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .agent-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-online  { background: #22c55e; box-shadow: 0 0 5px #22c55e99; }
+    .dot-offline { background: #ef4444; box-shadow: 0 0 5px #ef444499; }
+    .dot-error   { background: #f59e0b; box-shadow: 0 0 5px #f59e0b99; }
+    .dot-unknown { background: #475569; }
+
+    .agent-latency {
+      color: #475569;
+      font-size: 10px;
+      margin-left: 2px;
+    }
+
+    #agent-checked-at {
+      margin-left: auto;
+      font-size: 10px;
+      color: #334155;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>接案 OS — Kanban 看板</h1>
+  <div style="display:flex;align-items:center;gap:20px;">
+    <h1>接案 OS — Kanban 看板</h1>
+    <a href="/approval-queue.html" style="font-size:13px;color:#f59e0b;text-decoration:none;font-weight:600;" id="aq-nav-link">
+      人工審核佇列 <span id="aq-nav-badge" style="display:none;background:#f59e0b;color:#0f1117;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:4px;">0</span>
+    </a>
+    <a href="/task-governance.html" style="font-size:13px;color:#a78bfa;text-decoration:none;font-weight:600;">
+      任務治理 <span id="tg-nav-badge" style="display:none;background:#a78bfa;color:#0f1117;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:4px;">0</span>
+    </a>
+  </div>
   <div id="refresh-info">
     上次更新：<span id="last-update">—</span>　每 30 秒自動刷新
   </div>
 </header>
 
 <div id="error-banner"></div>
+
+<div id="kpi-block">
+  <div class="kpi-card">
+    <div class="kpi-card-label">新案件 (30天)</div>
+    <div class="kpi-card-value accent-purple" id="kpi-new-leads">—</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-card-label">AI 推薦</div>
+    <div class="kpi-card-value accent-cyan" id="kpi-ai-rec">—</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-card-label">報價數 (30天)</div>
+    <div class="kpi-card-value accent-yellow" id="kpi-quotes">—</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-card-label">成交數</div>
+    <div class="kpi-card-value accent-green" id="kpi-deals">—</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-card-label">轉換率</div>
+    <div class="kpi-card-value accent-orange" id="kpi-conv">—</div>
+  </div>
+</div>
+
+<div id="agent-status-panel">
+  <span class="agent-status-label">Agent 狀態</span>
+  <div class="agent-pills" id="agent-pills">
+    <span class="agent-pill"><span class="agent-dot dot-unknown"></span>載入中…</span>
+  </div>
+  <span id="agent-checked-at"></span>
+</div>
 
 <div id="loading">載入中…</div>
 
@@ -315,8 +456,94 @@ async function fetchAndRender() {
   }
 }
 
+async function fetchKpi() {
+  try {
+    const res = await fetch('/api/kpi');
+    if (!res.ok) return;
+    const d = await res.json();
+    document.getElementById('kpi-new-leads').textContent = d.new_leads       ?? '—';
+    document.getElementById('kpi-ai-rec').textContent    = d.ai_recommended  ?? '—';
+    document.getElementById('kpi-quotes').textContent    = d.quotes_sent      ?? '—';
+    document.getElementById('kpi-deals').textContent     = d.deals_won        ?? '—';
+    document.getElementById('kpi-conv').textContent      = d.conversion_rate != null ? d.conversion_rate + '%' : '—';
+  } catch (_) { /* non-fatal */ }
+}
+
+const AGENT_LABELS = {
+  'n8n':              'n8n',
+  'ollama':           'Ollama',
+  'telegram-bot':     'Telegram Bot',
+  'dev-dispatcher':   'Dev Dispatcher',
+  'revision-manager': 'Revision Manager',
+  'paperclip':        'Paperclip',
+};
+
+function renderAgentPills(agents) {
+  return agents.map(agent => {
+    const dotClass = agent.status === 'online' ? 'dot-online'
+                   : agent.status === 'offline' ? 'dot-offline'
+                   : agent.status === 'error'   ? 'dot-error'
+                   : 'dot-unknown';
+    const label = AGENT_LABELS[agent.name] || escHtml(agent.name);
+    const latency = agent.latency != null ? `<span class="agent-latency">${agent.latency}ms</span>` : '';
+    return `<span class="agent-pill"><span class="agent-dot ${dotClass}"></span>${label}${latency}</span>`;
+  }).join('');
+}
+
+async function fetchAgentStatus() {
+  try {
+    const res = await fetch('/api/agent-status');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    document.getElementById('agent-pills').innerHTML = renderAgentPills(data.agents);
+    const t = new Date(data.checked_at).toLocaleTimeString('zh-TW');
+    document.getElementById('agent-checked-at').textContent = `檢查於 ${t}`;
+  } catch (err) {
+    document.getElementById('agent-pills').innerHTML =
+      `<span class="agent-pill"><span class="agent-dot dot-error"></span>無法取得狀態</span>`;
+  }
+}
+
+async function fetchApprovalBadge() {
+  try {
+    const res = await fetch('/api/approval-queue');
+    if (!res.ok) return;
+    const { count } = await res.json();
+    const badge = document.getElementById('aq-nav-badge');
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch (_) {}
+}
+
+async function fetchTaskGovernanceBadge() {
+  try {
+    const res = await fetch('/api/task-governance?status=running');
+    if (!res.ok) return;
+    const { count } = await res.json();
+    const badge = document.getElementById('tg-nav-badge');
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch (_) {}
+}
+
 fetchAndRender();
+fetchKpi();
+fetchAgentStatus();
+fetchApprovalBadge();
+fetchTaskGovernanceBadge();
 setInterval(fetchAndRender, 30000);
+setInterval(fetchKpi, 30000);
+setInterval(fetchAgentStatus, 30000);
+setInterval(fetchApprovalBadge, 30000);
+setInterval(fetchTaskGovernanceBadge, 30000);
 </script>
 
 </body>

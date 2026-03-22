@@ -213,8 +213,56 @@ services:
       - PORT=3006
       - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - PROJECTS_ROOT=/projects
+      - PAPERCLIP_URL=http://paperclip:3008
     volumes:
       - ./projects:/projects
+    networks:
+      - agency-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      paperclip:
+        condition: service_started
+
+  # ─── Revision Manager ─────────────────────────────────────────
+  revision-manager:
+    build:
+      context: ./services/revision-manager
+      dockerfile: Dockerfile
+    container_name: agency-revision-manager
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=production
+      - PORT=3007
+      - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - PROJECTS_ROOT=/projects
+      - DEV_DISPATCHER_URL=http://dev-dispatcher:3006
+      - PAPERCLIP_URL=http://paperclip:3008
+    volumes:
+      - ./projects:/projects
+    networks:
+      - agency-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      paperclip:
+        condition: service_started
+
+  # ─── Paperclip Task Registry ──────────────────────────────────
+  paperclip:
+    build:
+      context: ./services/paperclip
+      dockerfile: Dockerfile
+    container_name: agency-paperclip
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+    environment:
+      - NODE_ENV=production
+      - PORT=3008
+      - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     networks:
       - agency-net
     depends_on:
@@ -234,8 +282,12 @@ services:
       - NODE_ENV=production
       - PORT=3003
       - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - PAPERCLIP_URL=http://paperclip:3008
+      - DEV_DISPATCHER_URL=http://dev-dispatcher:3006
     networks:
       - agency-net
     depends_on:
       postgres:
         condition: service_healthy
+      paperclip:
+        condition: service_started

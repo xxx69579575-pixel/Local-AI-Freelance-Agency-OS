@@ -1,6 +1,6 @@
 # Local AI Freelance Agency OS — 開發路線圖
 
-> **進度摘要：19 / 28 里程碑完成**
+> **進度摘要：23 / 28 里程碑完成**
 > 最後更新：2026-03-22
 
 ---
@@ -49,10 +49,10 @@
 
 **目標**：統一監控所有 agent 狀態與 KPI。
 
-- [ ] **4.1** 實作 Agent Runtime Status 面板（n8n / Ollama / Telegram / Claude Code 狀態）
-- [ ] **4.2** Human Approval Queue（待確認項目列表）
-- [ ] **4.3** KPI 區塊（新案件數、推薦數、報價數、成交數、轉換率）
-- [ ] **4.4** 整合 Paperclip 作為 agent 任務治理層
+- [x] **4.1** 實作 Agent Runtime Status 面板（n8n / Ollama / Telegram / Claude Code 狀態）
+- [x] **4.2** Human Approval Queue（待確認項目列表）
+- [x] **4.3** KPI 區塊（新案件數、推薦數、報價數、成交數、轉換率）
+- [x] **4.4** 整合 Paperclip 作為 agent 任務治理層
 
 ---
 
