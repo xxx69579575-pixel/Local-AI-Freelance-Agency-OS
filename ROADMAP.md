@@ -1,6 +1,6 @@
 # Local AI Freelance Agency OS — 開發路線圖
 
-> **進度摘要：5 / 28 里程碑完成**
+> **進度摘要：10 / 28 里程碑完成**
 > 最後更新：2026-03-22
 
 ---
@@ -14,11 +14,11 @@
 - [x] **1.3** 撰寫 PRD 與系統架構文件（`docs/PRD.md`、`docs/architecture.md`）
 - [x] **1.4** 撰寫 n8n workflow MVP 規格書（`docs/n8n-workflow-spec.md`）
 - [x] **1.5** 實作 Playwright 爬蟲服務，抓取公開案件列表（PRO360 / 出任務）
-- [ ] **1.6** 實作 Ollama 評分服務（risk_score / fit_score / profit_score）
-- [ ] **1.7** 建立 n8n 工作流：Scheduler → 爬蟲 → 評分 → 寫入 PostgreSQL
-- [ ] **1.8** 實作 Telegram Bot：發送案件摘要通知
-- [ ] **1.9** Telegram Bot 接收回覆：`聯絡報價 / 放棄報價 / 稍後處理`
-- [ ] **1.10** 建立基本 Kanban 看板（案件狀態流轉）
+- [x] **1.6** 實作 Ollama 評分服務（risk_score / fit_score / profit_score）
+- [x] **1.7** 建立 n8n 工作流：Scheduler → 爬蟲 → 評分 → 寫入 PostgreSQL
+- [x] **1.8** 實作 Telegram Bot：發送案件摘要通知
+- [x] **1.9** Telegram Bot 接收回覆：`聯絡報價 / 放棄報價 / 稍後處理`
+- [x] **1.10** 建立基本 Kanban 看板（案件狀態流轉）
 
 ---
 

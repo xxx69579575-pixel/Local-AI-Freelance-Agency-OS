@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>接案 OS — Kanban 看板</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #a78bfa;
+    }
+
+    #refresh-info {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    #refresh-info span {
+      color: #94a3b8;
+    }
+
+    #error-banner {
+      display: none;
+      background: #7f1d1d;
+      color: #fca5a5;
+      padding: 10px 24px;
+      font-size: 13px;
+    }
+
+    .board {
+      display: flex;
+      gap: 12px;
+      padding: 20px 24px;
+      overflow-x: auto;
+      min-height: calc(100vh - 64px);
+      align-items: flex-start;
+    }
+
+    .column {
+      flex: 0 0 220px;
+      background: #1a1d27;
+      border-radius: 10px;
+      border: 1px solid #2d3148;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .column-header {
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid #2d3148;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .column-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #94a3b8;
+    }
+
+    .column-count {
+      background: #2d3148;
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 1px 7px;
+      min-width: 22px;
+      text-align: center;
+    }
+
+    .column-count.has-items {
+      background: #4c1d95;
+      color: #c4b5fd;
+    }
+
+    .cards {
+      padding: 10px 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      min-height: 40px;
+    }
+
+    .card {
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 7px;
+      padding: 10px 12px;
+      cursor: default;
+      transition: border-color 0.15s;
+    }
+
+    .card:hover {
+      border-color: #4c1d95;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: #e2e8f0;
+      line-height: 1.4;
+      margin-bottom: 6px;
+      word-break: break-word;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .badge-source {
+      background: #1e3a5f;
+      color: #7dd3fc;
+    }
+
+    .score-pill {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .score-risk  { background: #450a0a; color: #fca5a5; }
+    .score-fit   { background: #052e16; color: #86efac; }
+    .score-profit{ background: #172554; color: #93c5fd; }
+
+    .card-date {
+      font-size: 10px;
+      color: #475569;
+      margin-top: 5px;
+    }
+
+    .empty-col {
+      font-size: 11px;
+      color: #334155;
+      text-align: center;
+      padding: 8px 0;
+    }
+
+    /* Status accent colours */
+    .col-new        .column-header { border-top: 3px solid #6366f1; border-radius: 10px 10px 0 0; }
+    .col-scoring    .column-header { border-top: 3px solid #a78bfa; border-radius: 10px 10px 0 0; }
+    .col-pending_decision .column-header { border-top: 3px solid #f59e0b; border-radius: 10px 10px 0 0; }
+    .col-rejected   .column-header { border-top: 3px solid #ef4444; border-radius: 10px 10px 0 0; }
+    .col-pending_quote .column-header { border-top: 3px solid #06b6d4; border-radius: 10px 10px 0 0; }
+    .col-quoted     .column-header { border-top: 3px solid #22d3ee; border-radius: 10px 10px 0 0; }
+    .col-negotiating .column-header { border-top: 3px solid #f97316; border-radius: 10px 10px 0 0; }
+    .col-negotiation_abandoned .column-header { border-top: 3px solid #78716c; border-radius: 10px 10px 0 0; }
+    .col-won        .column-header { border-top: 3px solid #22c55e; border-radius: 10px 10px 0 0; }
+    .col-in_development .column-header { border-top: 3px solid #3b82f6; border-radius: 10px 10px 0 0; }
+    .col-pending_review .column-header { border-top: 3px solid #eab308; border-radius: 10px 10px 0 0; }
+    .col-in_revision .column-header { border-top: 3px solid #ec4899; border-radius: 10px 10px 0 0; }
+    .col-pending_final .column-header { border-top: 3px solid #8b5cf6; border-radius: 10px 10px 0 0; }
+    .col-closed     .column-header { border-top: 3px solid #475569; border-radius: 10px 10px 0 0; }
+
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #64748b;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>接案 OS — Kanban 看板</h1>
+  <div id="refresh-info">
+    上次更新：<span id="last-update">—</span>　每 30 秒自動刷新
+  </div>
+</header>
+
+<div id="error-banner"></div>
+
+<div id="loading">載入中…</div>
+
+<div class="board" id="board" style="display:none"></div>
+
+<script>
+const COLUMNS = [
+  { key: 'new',                   label: '新案件' },
+  { key: 'scoring',               label: 'AI 評估中' },
+  { key: 'pending_decision',      label: '待你決策' },
+  { key: 'rejected',              label: '已拒絕' },
+  { key: 'pending_quote',         label: '待報價' },
+  { key: 'quoted',                label: '已送報價' },
+  { key: 'negotiating',           label: '商談中' },
+  { key: 'negotiation_abandoned', label: '商談放棄' },
+  { key: 'won',                   label: '已成交' },
+  { key: 'in_development',        label: '開發中' },
+  { key: 'pending_review',        label: '待初審' },
+  { key: 'in_revision',           label: '待修正' },
+  { key: 'pending_final',         label: '待最終確認' },
+  { key: 'closed',                label: '已結案' },
+];
+
+function scoreClass(type) {
+  return { risk: 'score-risk', fit: 'score-fit', profit: 'score-profit' }[type];
+}
+
+function scoreLabel(type) {
+  return { risk: 'R', fit: 'F', profit: 'P' }[type];
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderCard(lead) {
+  const scores = [
+    lead.risk_score   != null ? `<span class="score-pill score-risk">R${lead.risk_score}</span>`   : '',
+    lead.fit_score    != null ? `<span class="score-pill score-fit">F${lead.fit_score}</span>`     : '',
+    lead.profit_score != null ? `<span class="score-pill score-profit">P${lead.profit_score}</span>` : '',
+  ].join('');
+
+  return `
+    <div class="card" title="${escHtml(lead.title)}">
+      <div class="card-title">${escHtml(lead.title)}</div>
+      <div class="card-meta">
+        <span class="badge badge-source">${escHtml(lead.source)}</span>
+        ${scores}
+      </div>
+      <div class="card-date">${fmtDate(lead.scraped_at)}</div>
+    </div>
+  `;
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderBoard(data) {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  for (const col of COLUMNS) {
+    const bucket = data[col.key] || { count: 0, leads: [] };
+    const countClass = bucket.count > 0 ? 'column-count has-items' : 'column-count';
+    const cards = bucket.leads.length
+      ? bucket.leads.map(renderCard).join('')
+      : '<div class="empty-col">—</div>';
+
+    const colEl = document.createElement('div');
+    colEl.className = `column col-${col.key}`;
+    colEl.innerHTML = `
+      <div class="column-header">
+        <span class="column-label">${col.label}</span>
+        <span class="${countClass}">${bucket.count}</span>
+      </div>
+      <div class="cards">${cards}</div>
+    `;
+    board.appendChild(colEl);
+  }
+}
+
+async function fetchAndRender() {
+  const errorBanner = document.getElementById('error-banner');
+  try {
+    const res = await fetch('/api/kanban');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    renderBoard(data);
+    document.getElementById('board').style.display = 'flex';
+    document.getElementById('loading').style.display = 'none';
+    errorBanner.style.display = 'none';
+    document.getElementById('last-update').textContent = new Date().toLocaleTimeString('zh-TW');
+  } catch (err) {
+    errorBanner.textContent = `無法載入資料：${err.message}`;
+    errorBanner.style.display = 'block';
+    document.getElementById('loading').style.display = 'none';
+  }
+}
+
+fetchAndRender();
+setInterval(fetchAndRender, 30000);
+</script>
+
+</body>
+</html>

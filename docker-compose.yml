@@ -126,26 +126,72 @@ services:
       redis:
         condition: service_healthy
 
-  # ─── Ollama Scorer Service ────────────────────────────────────
-  scorer:
+  # ─── Telegram Bot Service ─────────────────────────────────────
+  telegram-bot:
     build:
-      context: ./services/scorer
+      context: ./services/telegram-bot
       dockerfile: Dockerfile
-    container_name: agency-scorer
+    container_name: agency-telegram-bot
     restart: unless-stopped
+    ports:
+      - "3004:3004"
     environment:
       - NODE_ENV=production
-      - PORT=3002
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - PORT=3004
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - NOTIFY_POLL_INTERVAL_MS=${NOTIFY_POLL_INTERVAL_MS:-30000}
+    networks:
+      - agency-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─── Ollama Scorer Service ────────────────────────────────────
+  ollama-scorer:
+    build:
+      context: ./services/scorer
+      dockerfile: Dockerfile
+    container_name: agency-ollama-scorer
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
     networks:
       - agency-net
     depends_on:
       ollama:
         condition: service_started
+
+  # ─── Kanban Dashboard ─────────────────────────────────────────
+  dashboard:
+    build:
+      context: ./services/dashboard
+      dockerfile: Dockerfile
+    container_name: agency-dashboard
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    networks:
+      - agency-net
+    depends_on:
       postgres:
         condition: service_healthy

@@ -1,0 +1,400 @@
+{
+  "meta": {
+    "instanceId": "local"
+  },
+  "name": "WF-03 Decision Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "telegram-decision",
+        "responseMode": "onReceived",
+        "responseData": "firstEntryJson",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "node-wf03-01",
+      "name": "Webhook - Telegram Decision",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "webhook-telegram-decision"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Telegram callback_query or simplified internal format\n// Expected body shapes:\n//   Native Telegram: { callback_query: { data: 'action:quote:42', from: { id: 123 }, message: { message_id: 99 } } }\n//   Internal:        { action: 'quote', lead_id: 42, chat_id: 123, message_id: 99 }\n\nconst body = $json.body || $json;\nlet action, lead_id, chat_id, message_id;\n\nif (body.callback_query) {\n  const data = body.callback_query.data || '';\n  const parts = data.split(':');\n  action = parts[1];\n  lead_id = parseInt(parts[2], 10);\n  chat_id = body.callback_query.from.id;\n  message_id = body.callback_query.message?.message_id;\n} else {\n  action = body.action;\n  lead_id = parseInt(body.lead_id, 10);\n  chat_id = body.chat_id;\n  message_id = body.message_id;\n}\n\nconst validActions = ['quote', 'reject', 'later'];\nif (!validActions.includes(action)) {\n  throw new Error(`Invalid action: ${action}. Must be one of: ${validActions.join(', ')}`);\n}\nif (!lead_id || isNaN(lead_id)) {\n  throw new Error(`Invalid lead_id: ${lead_id}`);\n}\n\nreturn [{ json: { action, lead_id, chat_id, message_id } }];"
+      },
+      "id": "node-wf03-02",
+      "name": "Code - Parse Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "id": "cond-quote",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "quote",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "quote"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "id": "cond-reject",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "reject",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reject"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "id": "cond-later",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "later",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "later"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-wf03-03",
+      "name": "Switch - Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads\nSET status = 'pending_quote', status_updated_at = NOW()\nWHERE id = {{ $json.lead_id }}\nRETURNING id, title, description, budget_raw, tech_stack",
+        "options": {}
+      },
+      "id": "node-wf03-a1",
+      "name": "Postgres - Update Pending Quote",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [960, 120],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Agency Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://scorer:3002/quotation",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "lead_id", "value": "={{ $json.id }}" }
+          ]
+        },
+        "options": {
+          "timeout": 40000
+        }
+      },
+      "id": "node-wf03-a2",
+      "name": "HTTP - Generate Quotation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1180, 120]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO quotations (lead_id, draft_content, generated_at)\nVALUES ({{ $json.lead_id }}, '{{ $json.draft.replace(/'/g, \"''\") }}', NOW())\nRETURNING id",
+        "options": {}
+      },
+      "id": "node-wf03-a3",
+      "name": "Postgres - Insert Quotation Draft",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1400, 120],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Agency Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chat_id", "value": "={{ $env.TELEGRAM_CHAT_ID }}" },
+            { "name": "text", "value": "=✏️ *報價草稿已生成*\n\n```\n{{ $node['HTTP - Generate Quotation'].json.draft }}\n```\n\n請確認後再送出。" },
+            { "name": "parse_mode", "value": "Markdown" },
+            {
+              "name": "reply_markup",
+              "value": "={\"inline_keyboard\":[[{\"text\":\"✅ 確認送出\",\"callback_data\":\"approve:quote:{{ $node['Postgres - Insert Quotation Draft'].json.id }}\"},{\"text\":\"✏️ 手動修改\",\"callback_data\":\"edit:quote:{{ $node['Postgres - Insert Quotation Draft'].json.id }}\"}]]}"
+            }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "node-wf03-a4",
+      "name": "Telegram - Send Quote Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1620, 120]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO agent_logs (agent_name, action, entity_type, entity_id, status, output_summary)\nVALUES ('telegram', 'decision_received', 'lead', {{ $node['Code - Parse Decision'].json.lead_id }}, 'success', 'action=quote, quotation draft sent')",
+        "options": {}
+      },
+      "id": "node-wf03-a5",
+      "name": "Postgres - Log Quote Action",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1840, 120],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Agency Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads\nSET status = 'rejected', status_updated_at = NOW()\nWHERE id = {{ $json.lead_id }}\nRETURNING id, title",
+        "options": {}
+      },
+      "id": "node-wf03-b1",
+      "name": "Postgres - Update Rejected",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [960, 300],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Agency Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chat_id", "value": "={{ $env.TELEGRAM_CHAT_ID }}" },
+            { "name": "text", "value": "=❌ 已將案件「{{ $json.title }}」標記為放棄 ✓" },
+            { "name": "parse_mode", "value": "Markdown" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "node-wf03-b2",
+      "name": "Telegram - Confirm Reject",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1180, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO agent_logs (agent_name, action, entity_type, entity_id, status, output_summary)\nVALUES ('telegram', 'decision_received', 'lead', {{ $node['Code - Parse Decision'].json.lead_id }}, 'success', 'action=reject')",
+        "options": {}
+      },
+      "id": "node-wf03-b3",
+      "name": "Postgres - Log Reject Action",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1400, 300],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Agency Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads\nSET status = 'pending_decision', status_updated_at = NOW()\nWHERE id = {{ $json.lead_id }}\nRETURNING id, title",
+        "options": {}
+      },
+      "id": "node-wf03-c1",
+      "name": "Postgres - Update Later",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [960, 480],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Agency Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chat_id", "value": "={{ $env.TELEGRAM_CHAT_ID }}" },
+            { "name": "text", "value": "=⏰ 已標記「{{ $json.title }}」為稍後處理，下次輪詢時會再提醒你 ⏰" },
+            { "name": "parse_mode", "value": "Markdown" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      },
+      "id": "node-wf03-c2",
+      "name": "Telegram - Confirm Later",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1180, 480]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO agent_logs (agent_name, action, entity_type, entity_id, status, output_summary)\nVALUES ('telegram', 'decision_received', 'lead', {{ $node['Code - Parse Decision'].json.lead_id }}, 'success', 'action=later')",
+        "options": {}
+      },
+      "id": "node-wf03-c3",
+      "name": "Postgres - Log Later Action",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1400, 480],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Agency Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Telegram Decision": {
+      "main": [
+        [{ "node": "Code - Parse Decision", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code - Parse Decision": {
+      "main": [
+        [{ "node": "Switch - Action", "type": "main", "index": 0 }]
+      ]
+    },
+    "Switch - Action": {
+      "main": [
+        [{ "node": "Postgres - Update Pending Quote", "type": "main", "index": 0 }],
+        [{ "node": "Postgres - Update Rejected", "type": "main", "index": 0 }],
+        [{ "node": "Postgres - Update Later", "type": "main", "index": 0 }]
+      ]
+    },
+    "Postgres - Update Pending Quote": {
+      "main": [
+        [{ "node": "HTTP - Generate Quotation", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP - Generate Quotation": {
+      "main": [
+        [{ "node": "Postgres - Insert Quotation Draft", "type": "main", "index": 0 }]
+      ]
+    },
+    "Postgres - Insert Quotation Draft": {
+      "main": [
+        [{ "node": "Telegram - Send Quote Draft", "type": "main", "index": 0 }]
+      ]
+    },
+    "Telegram - Send Quote Draft": {
+      "main": [
+        [{ "node": "Postgres - Log Quote Action", "type": "main", "index": 0 }]
+      ]
+    },
+    "Postgres - Update Rejected": {
+      "main": [
+        [{ "node": "Telegram - Confirm Reject", "type": "main", "index": 0 }]
+      ]
+    },
+    "Telegram - Confirm Reject": {
+      "main": [
+        [{ "node": "Postgres - Log Reject Action", "type": "main", "index": 0 }]
+      ]
+    },
+    "Postgres - Update Later": {
+      "main": [
+        [{ "node": "Telegram - Confirm Later", "type": "main", "index": 0 }]
+      ]
+    },
+    "Telegram - Confirm Later": {
+      "main": [
+        [{ "node": "Postgres - Log Later Action", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "id": "wf-03-decision-handler",
+  "tags": ["phase-1", "telegram", "webhook", "mvp"]
+}

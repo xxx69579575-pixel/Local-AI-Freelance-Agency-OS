@@ -1,0 +1,268 @@
+{
+  "meta": {
+    "instanceId": "local"
+  },
+  "name": "WF-02 Telegram Notifier",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        },
+        "timezone": "Asia/Taipei"
+      },
+      "id": "node-wf02-01",
+      "name": "Schedule - Every 5 Min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "lrange",
+        "key": "queue:notify",
+        "index": 0,
+        "index2": 4
+      },
+      "id": "node-wf02-02",
+      "name": "Redis - Get Notify Queue",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "credentials": {
+        "redis": {
+          "id": "REDIS_CREDENTIAL_ID",
+          "name": "Agency Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-has-items",
+              "leftValue": "={{ $json.value !== null && $json.value !== undefined && String($json.value).trim() !== '' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-wf02-03",
+      "name": "IF - Queue Has Items",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the Redis LRANGE response — value may be comma-separated or single id\n// Redis node returns { value: '42,57,61' } or individual items\nconst raw = String($json.value || '');\nconst ids = raw.split(',').map(s => s.trim()).filter(Boolean);\nreturn ids.map(id => ({ json: { lead_id: parseInt(id, 10) } }));"
+      },
+      "id": "node-wf02-04",
+      "name": "Code - Parse Lead IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 180]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  id, title, source, url,\n  budget_estimate, deadline,\n  tech_stack,\n  risk_score, fit_score, expected_profit_score,\n  reason_summary, recommended_action\nFROM leads\nWHERE id = {{ $json.lead_id }}\n  AND status = 'pending_decision'",
+        "options": {}
+      },
+      "id": "node-wf02-05",
+      "name": "Postgres - Get Lead Details",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1120, 180],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Agency Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Telegram message with inline keyboard\nconst lead = $json;\nconst techStack = Array.isArray(lead.tech_stack) ? lead.tech_stack.join(', ') : (lead.tech_stack || 'N/A');\nconst budget = lead.budget_estimate || 'N/A';\nconst deadline = lead.deadline ? new Date(lead.deadline).toLocaleDateString('zh-TW') : 'N/A';\n\nconst text = [\n  '📋 *新案件通知*',\n  '',\n  `📌 *${lead.title}*`,\n  `🌐 來源：${lead.source}`,\n  `💰 預算：${budget}`,\n  `📅 截止：${deadline}`,\n  `🛠 技術：${techStack}`,\n  '',\n  '📊 *AI 評分*',\n  `⚠️ 風險：${lead.risk_score ?? 'N/A'}/10`,\n  `✅ 適合：${lead.fit_score ?? 'N/A'}/10`,\n  `💵 利潤：${lead.expected_profit_score ?? 'N/A'}/10`,\n  '',\n  `💬 ${lead.reason_summary || ''}`,\n  '',\n  '---',\n  '請選擇：'\n].join('\\n');\n\nconst replyMarkup = JSON.stringify({\n  inline_keyboard: [[\n    { text: '✅ 聯絡報價', callback_data: `action:quote:${lead.id}` },\n    { text: '❌ 放棄', callback_data: `action:reject:${lead.id}` },\n    { text: '⏰ 稍後處理', callback_data: `action:later:${lead.id}` }\n  ]]\n});\n\nreturn [{\n  json: {\n    ...lead,\n    telegram_text: text,\n    telegram_reply_markup: replyMarkup\n  }\n}];"
+      },
+      "id": "node-wf02-06",
+      "name": "Code - Format Telegram Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "chat_id", "value": "={{ $env.TELEGRAM_CHAT_ID }}" },
+            { "name": "text", "value": "={{ $json.telegram_text }}" },
+            { "name": "parse_mode", "value": "Markdown" },
+            { "name": "reply_markup", "value": "={{ $json.telegram_reply_markup }}" }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "retry": {
+            "enabled": true,
+            "maxTries": 2,
+            "waitBetweenTries": 3000
+          }
+        }
+      },
+      "id": "node-wf02-07",
+      "name": "HTTP - Telegram Send Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 180]
+    },
+    {
+      "parameters": {
+        "operation": "lrem",
+        "key": "queue:notify",
+        "count": 1,
+        "value": "={{ $json.id }}"
+      },
+      "id": "node-wf02-08",
+      "name": "Redis - Remove From Queue",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [1780, 180],
+      "credentials": {
+        "redis": {
+          "id": "REDIS_CREDENTIAL_ID",
+          "name": "Agency Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=telegram:session:{{ $env.TELEGRAM_CHAT_ID }}",
+        "value": "={{ $json.id }}",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "node-wf02-09",
+      "name": "Redis - Set Session",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [2000, 180],
+      "credentials": {
+        "redis": {
+          "id": "REDIS_CREDENTIAL_ID",
+          "name": "Agency Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO agent_logs (agent_name, action, entity_type, entity_id, status, output_summary)\nVALUES ('telegram', 'notify_sent', 'lead', {{ $json.id }}, 'success', 'Telegram notification sent for lead: {{ $json.title }}')",
+        "options": {}
+      },
+      "id": "node-wf02-10",
+      "name": "Postgres - Log Notified",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2220, 180],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Agency Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "node-wf02-stop",
+      "name": "NoOp - Queue Empty",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [900, 420]
+    }
+  ],
+  "connections": {
+    "Schedule - Every 5 Min": {
+      "main": [
+        [{ "node": "Redis - Get Notify Queue", "type": "main", "index": 0 }]
+      ]
+    },
+    "Redis - Get Notify Queue": {
+      "main": [
+        [{ "node": "IF - Queue Has Items", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF - Queue Has Items": {
+      "main": [
+        [{ "node": "Code - Parse Lead IDs", "type": "main", "index": 0 }],
+        [{ "node": "NoOp - Queue Empty", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code - Parse Lead IDs": {
+      "main": [
+        [{ "node": "Postgres - Get Lead Details", "type": "main", "index": 0 }]
+      ]
+    },
+    "Postgres - Get Lead Details": {
+      "main": [
+        [{ "node": "Code - Format Telegram Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "Code - Format Telegram Message": {
+      "main": [
+        [{ "node": "HTTP - Telegram Send Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP - Telegram Send Message": {
+      "main": [
+        [{ "node": "Redis - Remove From Queue", "type": "main", "index": 0 }]
+      ]
+    },
+    "Redis - Remove From Queue": {
+      "main": [
+        [{ "node": "Redis - Set Session", "type": "main", "index": 0 }]
+      ]
+    },
+    "Redis - Set Session": {
+      "main": [
+        [{ "node": "Postgres - Log Notified", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "id": "wf-02-telegram-notifier",
+  "tags": ["phase-1", "telegram", "mvp"]
+}
