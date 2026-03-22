@@ -1,0 +1,24 @@
+# Phase 3.4 — 安全審計 (security-audit)
+
+- [x] 掃描 OWASP Top 10 風險（XSS、Injection、Broken Auth、Sensitive Data Exposure 等）
+  - A01 Broken Access Control: 高風險 — 兩個 API 模組均無身份驗證
+  - A03 Injection: 通過 — slug 清理有效防止路徑遍歷，無 SQL/Command Injection 風險
+  - A05 Security Misconfiguration: 高風險 — .mcp.json 硬編碼 API 金鑰；缺少 CORS
+  - A07 Authentication Failures: 高風險 — 無任何認證機制
+  - A09 Logging & Monitoring: 中風險 — 缺少結構化審計日誌
+- [x] 檢查依賴套件已知漏洞（`npm audit` 或對應工具）
+  - npm audit 結果：零漏洞（0 vulnerabilities，348 packages）
+  - handlebars 4.7.8 已修復歷史 RCE；所有依賴版本安全
+- [x] 審查環境變數與金鑰管理（是否有硬編碼敏感資訊）
+  - 高風險：.mcp.json 含明文 Context7 API 金鑰（CWE-798）
+  - 通過：Anthropic API Key 正確使用環境變數（ANTHROPIC_API_KEY）
+- [x] 檢查 API 端點的輸入驗證、認證與授權
+  - 輸入驗證：alias 白名單、必填欄位驗證均通過
+  - 認證/授權：完全缺失（高風險）
+  - 中風險：原始錯誤訊息洩漏至用戶端
+- [x] 審查 IPC 檔案讀寫的路徑遍歷與注入風險
+  - 路徑遍歷：通過 — slug 清理有效封閉攻擊向量
+  - 低風險：.answer 檔案缺少 HMAC 簽名驗證
+- [x] 輸出安全審計報告到 `docs/security/2026-03-22-audit.md`（高/中/低風險分級）
+  - 報告已生成：9 個安全項目（3 高風險 / 3 中風險 / 3 低風險）+ DEP-001 零漏洞
+- [x] 將完成摘要寫入 `.dispatch/tasks/security-audit/output.md`

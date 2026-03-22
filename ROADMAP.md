@@ -1,6 +1,6 @@
 # Local AI Freelance Agency OS — 開發路線圖
 
-> **進度摘要：12 / 23 里程碑完成**
+> **進度摘要：16 / 23 里程碑完成**
 >
 > 最後更新：2026-03-22 | 方法論：SDD（規格驅動開發）
 
@@ -66,13 +66,13 @@
 
 **目標**：確保實作符合規格、安全無虞、測試全部通過。
 
-- [ ] **3.1** 執行完整程式碼審查（正確性、安全性、效能、規格符合度），輸出至 `docs/reviews/`
+- [x] **3.1** 執行完整程式碼審查（正確性、安全性、效能、規格符合度），輸出至 `docs/reviews/`
   → `/dispatch "code-review"`
-- [ ] **3.2** 逐條對照驗收標準執行 QA 檢查，輸出 pass/fail 報告至 `docs/qa/`
+- [x] **3.2** 逐條對照驗收標準執行 QA 檢查，輸出 pass/fail 報告至 `docs/qa/`
   → `/dispatch "qa-check"`
-- [ ] **3.3** 執行測試套件，確認所有測試通過
+- [x] **3.3** 執行測試套件，確認所有測試通過
   → `/dispatch "run-tests"`
-- [ ] **3.4** 執行安全審計（OWASP Top 10、依賴漏洞、API 認證），輸出至 `docs/security/`
+- [x] **3.4** 執行安全審計（OWASP Top 10、依賴漏洞、API 認證），輸出至 `docs/security/`
   → `/dispatch "security-audit"`
 
 ---
