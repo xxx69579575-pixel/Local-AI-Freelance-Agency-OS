@@ -35,6 +35,11 @@ services:
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_BULL_REDIS_PORT=6379
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - DB_POSTGRESDB_SSL_ENABLED=false
+      - PGSSLMODE=disable
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
       - n8n_data:/home/node/.n8n
     networks:
