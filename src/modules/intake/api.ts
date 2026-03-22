@@ -6,6 +6,24 @@ import { logger } from "../../utils/logger.js";
 import type { IntakeInput } from "../../types/intake.js";
 
 /**
+ * Handle an intake API request directly (for use in a combined server).
+ */
+export function handleIntakeRequest(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): void {
+  handleRequest(req, res).catch((err: unknown) => {
+    logger.error("Unhandled API error", { error: (err as Error).message });
+    if (!res.headersSent) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({ status: "error", message: "Internal server error" }),
+      );
+    }
+  });
+}
+
+/**
  * Create and return an http.Server that handles intake API requests.
  * Call server.listen(port) to start.
  */
