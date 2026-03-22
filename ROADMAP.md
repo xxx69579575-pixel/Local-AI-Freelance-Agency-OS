@@ -1,6 +1,6 @@
 # Local AI Freelance Agency OS — 開發路線圖
 
-> **進度摘要：15 / 28 里程碑完成**
+> **進度摘要：19 / 28 里程碑完成**
 > 最後更新：2026-03-22
 
 ---
@@ -38,10 +38,10 @@
 
 **目標**：Dev Agent 執行開發，客戶回饋轉成修改任務。
 
-- [ ] **3.1** 實作 Dev Agent Dispatcher（將 brief.md 轉發給 Claude Code / Codex）
-- [ ] **3.2** 實作 Revision Manager（客戶回饋 → revision-NNN.md）
-- [ ] **3.3** Claude Code / Codex 依 md 執行修正
-- [ ] **3.4** 修正完成後通知客戶確認流程
+- [x] **3.1** 實作 Dev Agent Dispatcher（將 brief.md 轉發給 Claude Code / Codex）
+- [x] **3.2** 實作 Revision Manager（客戶回饋 → revision-NNN.md）
+- [x] **3.3** Claude Code / Codex 依 md 執行修正
+- [x] **3.4** 修正完成後通知客戶確認流程
 
 ---
 

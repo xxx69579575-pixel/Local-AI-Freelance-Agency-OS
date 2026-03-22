@@ -8,6 +8,7 @@ const { Pool }   = require('pg');
 const Redis      = require('ioredis');
 
 const { formatLeadMessage, buildLeadKeyboard, formatQuoteDraft, buildQuoteKeyboard, escMd } = require('./formatter');
+const { startCompletionPoller } = require('./notify-complete');
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -329,6 +330,9 @@ bot.on('callback_query', async (query) => {
   const messageId = query.message.message_id;
   const data      = query.data || '';  // node-telegram-bot-api uses query.data, not query.callback_data
 
+  // Phase 3.4 completion callbacks are handled by notify-complete.js
+  if (/^(confirm|revise)_\d+$/.test(data)) return;
+
   const parts = data.split(':');
   if (parts.length !== 3) {
     console.warn(`[telegram-bot] Unexpected callback_data: ${data}`);
@@ -581,6 +585,9 @@ async function start() {
   setInterval(pollNotifyQueue, POLL_INTERVAL_MS);
   setInterval(pollQuoteQueue,  POLL_INTERVAL_MS);
   console.log(`[telegram-bot] Queue pollers started (interval ${POLL_INTERVAL_MS}ms)`);
+
+  // Phase 3.4 — completion notification poller
+  await startCompletionPoller(bot, db, CHAT_ID);
 
   // Start HTTP server
   app.listen(PORT, () => {

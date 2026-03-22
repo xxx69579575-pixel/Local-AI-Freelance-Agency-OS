@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 const { generateTaskInstruction } = require('./task-template');
+const { runClaudeTask } = require('./claude-runner');
 
 const PORT = process.env.PORT || 3006;
 const PROJECTS_ROOT = process.env.PROJECTS_ROOT || '/projects';
@@ -108,13 +109,17 @@ app.post('/dispatch', async (req, res) => {
     );
 
     // 5. Respond
-    return res.json({
+    res.json({
       dispatched: true,
       project_id: project.id,
       task_file: taskFilePath,
       dispatched_at: dispatchedAt,
-      note: 'Task file prepared. Run Claude Code against the task file to begin execution.',
+      note: 'Claude runner started asynchronously.',
     });
+
+    // 6. Async: spawn claude --print against the task file
+    setImmediate(() => runClaudeTask(workspacePath, project.id));
+    return;
   } catch (err) {
     console.error('[dispatch] error:', err);
     return res.status(500).json({ error: 'Internal server error', detail: err.message });
@@ -125,29 +130,137 @@ app.post('/dispatch', async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // GET /status/:project_id
-// Returns the latest dispatch log for the project
+// Returns the latest agent_log entry for the project
 // ---------------------------------------------------------------------------
 app.get('/status/:project_id', async (req, res) => {
   const id = Number(req.params.project_id);
 
-  if (!Number.isInteger(id)) {
-    return res.status(400).json({ error: 'project_id must be an integer' });
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'project_id must be a positive integer' });
   }
 
   try {
+    // Verify project exists
+    const { rows: projectRows } = await pool.query(
+      'SELECT id FROM projects WHERE id = $1',
+      [id]
+    );
+    if (projectRows.length === 0) {
+      return res.status(404).json({ error: `Project ${id} not found` });
+    }
+
     const { rows } = await pool.query(
       `SELECT id, agent_name, action, status, input_summary, output_summary, metadata, created_at
        FROM agent_logs
        WHERE entity_type = 'project' AND entity_id = $1 AND agent_name = 'claude-code'
        ORDER BY created_at DESC
-       LIMIT 10`,
+       LIMIT 1`,
       [id]
     );
 
-    return res.json({ project_id: id, logs: rows });
+    if (rows.length === 0) {
+      return res.json({ project_id: id, log: null, message: 'No dispatch logs found for this project' });
+    }
+
+    return res.json({ project_id: id, log: rows[0] });
   } catch (err) {
     console.error('[status] error:', err);
     return res.status(500).json({ error: 'Internal server error', detail: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /complete
+// Body: { project_id, summary }
+//
+// 1. Verify project exists
+// 2. Insert agent_logs record (agent=claude-code, action=complete, status=success)
+// 3. Update projects.status → 'pending_review' (待初審)
+// 4. Insert kanban_status change record
+// 5. Return { completed: true }
+// ---------------------------------------------------------------------------
+app.post('/complete', async (req, res) => {
+  const { project_id, summary } = req.body;
+
+  if (!project_id || !Number.isInteger(Number(project_id))) {
+    return res.status(400).json({ error: 'project_id (integer) is required' });
+  }
+  if (!summary || typeof summary !== 'string' || summary.trim() === '') {
+    return res.status(400).json({ error: 'summary (non-empty string) is required' });
+  }
+
+  const id = Number(project_id);
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Fetch project (need current status for kanban log)
+    const { rows } = await client.query(
+      'SELECT id, status FROM projects WHERE id = $1',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: `Project ${id} not found` });
+    }
+
+    const prevStatus = rows[0].status;
+    const completedAt = new Date().toISOString();
+
+    // 2. Insert agent_logs (completed)
+    await client.query(
+      `INSERT INTO agent_logs
+         (agent_name, action, entity_type, entity_id, status, input_summary, output_summary, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        'claude-code',
+        'complete',
+        'project',
+        id,
+        'success',
+        `project_id=${id}`,
+        summary.trim(),
+        JSON.stringify({ completed_at: completedAt }),
+      ]
+    );
+
+    // 3. Update projects.status → pending_review (待初審)
+    await client.query(
+      `UPDATE projects SET status = 'pending_review', updated_at = NOW() WHERE id = $1`,
+      [id]
+    );
+
+    // 4. Insert kanban_status change record
+    await client.query(
+      `INSERT INTO kanban_status (entity_type, entity_id, from_status, to_status, triggered_by, note)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        'project',
+        id,
+        prevStatus,
+        'pending_review',
+        'webhook',
+        `Agent reported completion: ${summary.trim().slice(0, 200)}`,
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    return res.json({
+      completed: true,
+      project_id: id,
+      new_status: 'pending_review',
+      completed_at: completedAt,
+      note: 'Project moved to pending_review (待初審). Human review required before delivery.',
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[complete] error:', err);
+    return res.status(500).json({ error: 'Internal server error', detail: err.message });
+  } finally {
+    client.release();
   }
 });
 
