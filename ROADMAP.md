@@ -1,6 +1,6 @@
 # Local AI Freelance Agency OS — 開發路線圖
 
-> **進度摘要：0 / 23 里程碑完成**
+> **進度摘要：7 / 23 里程碑完成**
 >
 > 最後更新：2026-03-22 | 方法論：SDD（規格驅動開發）
 
@@ -21,11 +21,11 @@
 
 **目標**：確保開發環境完整，所有工具、指令、版本控制皆就緒。
 
-- [ ] **0.1** 確認 `.mcp.json` 已掛載通用 MCP 工具（context7、playwright、icon-generator）
+- [x] **0.1** 確認 `.mcp.json` 已掛載通用 MCP 工具（context7、playwright、icon-generator）
   → `/dispatch "init-env"`
-- [ ] **0.2** 確認 `.claude/commands/` 已載入三個 slash commands（`deploy_vercel.md`、`depoly_github_page.md`、`update.md`）
+- [x] **0.2** 確認 `.claude/commands/` 已載入三個 slash commands（`deploy_vercel.md`、`depoly_github_page.md`、`update.md`）
   → `/dispatch "load-commands"`
-- [ ] **0.3** 確認 git 已初始化，`user.name="dev"`，`user.email="dev@example.com"`，並完成 first commit
+- [x] **0.3** 確認 git 已初始化，`user.name="dev"`，`user.email="dev@example.com"`，並完成 first commit
   → `/dispatch "init-git"` → `/dispatch "first-commit"`
 
 ---
@@ -34,13 +34,13 @@
 
 **目標**：依 SDD 流程，在寫任何程式碼之前，先將需求轉化為可測試的規格文件。
 
-- [ ] **1.1** 訪談分析客戶需求，整理 MVP 功能清單與技術風險，輸出至 `docs/intake/`
+- [x] **1.1** 訪談分析客戶需求，整理 MVP 功能清單與技術風險，輸出至 `docs/intake/`
   → `/dispatch "intake: [描述客戶需求或貼上需求文件]"`
-- [ ] **1.2** 依需求摘要撰寫完整功能規格（含使用者故事、技術規格、驗收標準），輸出至 `docs/specs/`
+- [x] **1.2** 依需求摘要撰寫完整功能規格（含使用者故事、技術規格、驗收標準），輸出至 `docs/specs/`
   → `/dispatch "write-spec: [指定功能名稱]"`
-- [ ] **1.3** 從實作者角度審查規格文件，標注模糊或矛盾之處，輸出至 `docs/specs/review/`
+- [x] **1.3** 從實作者角度審查規格文件，標注模糊或矛盾之處，輸出至 `docs/specs/review/`
   → `/dispatch "review-spec"`
-- [ ] **1.4** 根據審查意見修訂規格，加上版本號與 changelog，確保所有審查問題已解決
+- [x] **1.4** 根據審查意見修訂規格，加上版本號與 changelog，確保所有審查問題已解決
   → `/dispatch "update-spec"`
 
 ---
