@@ -1,6 +1,6 @@
 # Local AI Freelance Agency OS — 開發路線圖
 
-> **進度摘要：0 / 28 里程碑完成**
+> **進度摘要：4 / 28 里程碑完成**
 > 最後更新：2026-03-22
 
 ---
@@ -9,10 +9,10 @@
 
 **目標**：能自動抓案件、AI 評分、Telegram 通知、人工決策、Kanban 追蹤。
 
-- [ ] **1.1** 建立 Docker Compose 骨架（n8n + Ollama + PostgreSQL + Redis + Telegram Bot）
-- [ ] **1.2** 設計並建立 PostgreSQL schema（leads、projects、kanban_status、agent_logs）
-- [ ] **1.3** 撰寫 PRD 與系統架構文件（`docs/PRD.md`、`docs/architecture.md`）
-- [ ] **1.4** 撰寫 n8n workflow MVP 規格書（`docs/n8n-workflow-spec.md`）
+- [x] **1.1** 建立 Docker Compose 骨架（n8n + Ollama + PostgreSQL + Redis + Scraper + Scorer）
+- [x] **1.2** 設計並建立 PostgreSQL schema（leads、projects、kanban_status、agent_logs、quotations、revisions）
+- [x] **1.3** 撰寫 PRD 與系統架構文件（`docs/PRD.md`、`docs/architecture.md`）
+- [x] **1.4** 撰寫 n8n workflow MVP 規格書（`docs/n8n-workflow-spec.md`）
 - [ ] **1.5** 實作 Playwright 爬蟲服務，抓取公開案件列表（PRO360 / 出任務）
 - [ ] **1.6** 實作 Ollama 評分服務（risk_score / fit_score / profit_score）
 - [ ] **1.7** 建立 n8n 工作流：Scheduler → 爬蟲 → 評分 → 寫入 PostgreSQL

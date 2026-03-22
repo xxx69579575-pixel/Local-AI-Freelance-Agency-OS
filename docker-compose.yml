@@ -112,13 +112,19 @@ services:
       dockerfile: Dockerfile
     container_name: agency-scraper
     restart: unless-stopped
+    ports:
+      - "3001:3001"
     environment:
       - NODE_ENV=production
       - PORT=3001
+      - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     networks:
       - agency-net
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   # ─── Ollama Scorer Service ────────────────────────────────────
   scorer:
