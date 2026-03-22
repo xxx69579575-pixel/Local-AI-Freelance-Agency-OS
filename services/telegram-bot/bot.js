@@ -16,7 +16,8 @@ const BOT_TOKEN    = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID      = process.env.TELEGRAM_CHAT_ID;
 const PORT         = parseInt(process.env.PORT || '3003', 10);
 const POLL_INTERVAL_MS = parseInt(process.env.NOTIFY_POLL_INTERVAL_MS || '30000', 10);
-const SCORER_URL   = process.env.SCORER_URL || 'http://scorer:3002';
+const SCORER_URL        = process.env.SCORER_URL        || 'http://scorer:3002';
+const COMM_ASSISTANT_URL = process.env.COMM_ASSISTANT_URL || 'http://comm-assistant:3009';
 
 if (!BOT_TOKEN) {
   console.error('[telegram-bot] TELEGRAM_BOT_TOKEN is required');
@@ -333,6 +334,23 @@ bot.on('callback_query', async (query) => {
   // Phase 3.4 completion callbacks are handled by notify-complete.js
   if (/^(confirm|revise)_\d+$/.test(data)) return;
 
+  // Phase 5.3 — comm:confirm:<id> / comm:regen:<id>
+  if (data.startsWith('comm:')) {
+    const commParts = data.split(':');
+    if (commParts.length === 3) {
+      const [, commAction, commProjectIdStr] = commParts;
+      const commProjectId = parseInt(commProjectIdStr, 10);
+      if (!isNaN(commProjectId)) {
+        await handleCommCallback(query, commAction, commProjectId, String(chatId), messageId);
+      } else {
+        await bot.answerCallbackQuery(query.id, { text: '無效操作' });
+      }
+    } else {
+      await bot.answerCallbackQuery(query.id, { text: '無效操作' });
+    }
+    return;
+  }
+
   const parts = data.split(':');
   if (parts.length !== 3) {
     console.warn(`[telegram-bot] Unexpected callback_data: ${data}`);
@@ -532,6 +550,231 @@ bot.on('callback_query', async (query) => {
   console.warn(`[telegram-bot] Unknown callback namespace '${namespace}' in: ${data}`);
   await bot.answerCallbackQuery(query.id, { text: '無效操作' });
 });
+
+// ─── Phase 5.3 — /reply command ───────────────────────────────────────────────
+//
+// Usage: /reply <project_id> <client message...>
+// Calls comm-assistant POST /draft-reply, sends draft with inline keyboard.
+
+bot.onText(/^\/reply(?:@\S+)?\s+(\d+)\s+([\s\S]+)$/, async (msg, match) => {
+  const chatId        = String(msg.chat.id);
+  const projectId     = parseInt(match[1], 10);
+  const clientMessage = match[2].trim();
+
+  // Acknowledge
+  let ackMsg;
+  try {
+    ackMsg = await bot.sendMessage(chatId, '⏳ 正在生成回覆草稿…', {
+      reply_to_message_id: msg.message_id,
+    });
+  } catch (_) {}
+
+  let draftData;
+  try {
+    const r = await fetch(`${COMM_ASSISTANT_URL}/draft-reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: projectId, client_message: clientMessage }),
+      signal: AbortSignal.timeout(130000),
+    });
+    if (!r.ok) {
+      const text = await r.text();
+      throw new Error(`comm-assistant ${r.status}: ${text}`);
+    }
+    draftData = await r.json();
+  } catch (err) {
+    console.error(`[telegram-bot] /reply draft-reply error:`, err.message);
+    await bot.sendMessage(
+      chatId,
+      `❌ 草稿生成失敗：${escMd(err.message)}`,
+      { parse_mode: 'MarkdownV2', reply_to_message_id: msg.message_id }
+    ).catch(() => {});
+    return;
+  }
+
+  const draft = draftData.draft;
+
+  // Store draft in Redis for confirm/regen callbacks
+  const sessionKey = `telegram:comm:session:${chatId}:proj:${projectId}`;
+  await redis.set(
+    sessionKey,
+    JSON.stringify({ project_id: projectId, client_message: clientMessage, draft }),
+    'EX', 86400
+  ).catch(() => {});
+
+  // Delete ack message
+  if (ackMsg) {
+    await bot.deleteMessage(chatId, ackMsg.message_id).catch(() => {});
+  }
+
+  const draftText = [
+    `💬 *回覆草稿* \\(專案 \\#${escMd(String(projectId))}\\)`,
+    ``,
+    escMd(draft),
+    ``,
+    `\\-\\-\\-`,
+    `請選擇操作：`,
+  ].join('\n');
+
+  const keyboard = {
+    inline_keyboard: [[
+      { text: '✅ 確認記錄', callback_data: `comm:confirm:${projectId}` },
+      { text: '🔄 重新生成', callback_data: `comm:regen:${projectId}` },
+    ]],
+  };
+
+  try {
+    const draftMsg = await bot.sendMessage(chatId, draftText, {
+      parse_mode: 'MarkdownV2',
+      reply_markup: keyboard,
+      reply_to_message_id: msg.message_id,
+    });
+
+    // Update Redis key to include message_id so callback can clear keyboard
+    await redis.set(
+      sessionKey,
+      JSON.stringify({ project_id: projectId, client_message: clientMessage, draft, message_id: draftMsg.message_id }),
+      'EX', 86400
+    ).catch(() => {});
+  } catch (err) {
+    console.error('[telegram-bot] Failed to send draft message:', err.message);
+  }
+});
+
+// ─── Phase 5.3 — comm callback handler ────────────────────────────────────────
+
+async function handleCommCallback(query, action, projectId, chatId, messageId) {
+  const sessionKey = `telegram:comm:session:${chatId}:proj:${projectId}`;
+  let session = null;
+  try {
+    const raw = await redis.get(sessionKey);
+    if (raw) session = JSON.parse(raw);
+  } catch (_) {}
+
+  if (!session) {
+    await bot.answerCallbackQuery(query.id, { text: '草稿已過期，請重新執行 /reply' });
+    return;
+  }
+
+  if (action === 'confirm') {
+    // Append draft to client-log.md via comm-assistant
+    try {
+      const r = await fetch(`${COMM_ASSISTANT_URL}/log-reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId, draft: session.draft }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(`comm-assistant ${r.status}: ${text}`);
+      }
+      const logData = await r.json();
+
+      // Remove keyboard
+      await bot.editMessageReplyMarkup(
+        { inline_keyboard: [] },
+        { chat_id: chatId, message_id: messageId }
+      ).catch(() => {});
+
+      await bot.answerCallbackQuery(query.id, { text: '草稿已記錄 ✓' });
+
+      await bot.sendMessage(
+        chatId,
+        `✅ *回覆草稿已記錄*\n已寫入 \`${escMd(logData.log_path || 'client-log.md')}\`\n\n⚠️ 請記得手動將回覆發送給客戶\\.`,
+        { parse_mode: 'MarkdownV2', reply_to_message_id: messageId }
+      );
+
+      await redis.del(sessionKey).catch(() => {});
+
+      console.log(`[telegram-bot] comm confirm: project ${projectId} draft logged`);
+    } catch (err) {
+      console.error('[telegram-bot] comm confirm error:', err.message);
+      await bot.answerCallbackQuery(query.id, { text: '記錄失敗，請稍後重試' }).catch(() => {});
+    }
+    return;
+  }
+
+  if (action === 'regen') {
+    // Re-generate draft with same client_message
+    await bot.answerCallbackQuery(query.id, { text: '正在重新生成…' });
+
+    // Remove old keyboard
+    await bot.editMessageReplyMarkup(
+      { inline_keyboard: [] },
+      { chat_id: chatId, message_id: messageId }
+    ).catch(() => {});
+
+    let draftData;
+    try {
+      const r = await fetch(`${COMM_ASSISTANT_URL}/draft-reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId, client_message: session.client_message }),
+        signal: AbortSignal.timeout(130000),
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(`comm-assistant ${r.status}: ${text}`);
+      }
+      draftData = await r.json();
+    } catch (err) {
+      console.error('[telegram-bot] comm regen error:', err.message);
+      await bot.sendMessage(
+        chatId,
+        `❌ 重新生成失敗：${escMd(err.message)}`,
+        { parse_mode: 'MarkdownV2' }
+      ).catch(() => {});
+      return;
+    }
+
+    const newDraft = draftData.draft;
+
+    // Update session
+    await redis.set(
+      sessionKey,
+      JSON.stringify({ project_id: projectId, client_message: session.client_message, draft: newDraft }),
+      'EX', 86400
+    ).catch(() => {});
+
+    const draftText = [
+      `💬 *回覆草稿（重新生成）* \\(專案 \\#${escMd(String(projectId))}\\)`,
+      ``,
+      escMd(newDraft),
+      ``,
+      `\\-\\-\\-`,
+      `請選擇操作：`,
+    ].join('\n');
+
+    const keyboard = {
+      inline_keyboard: [[
+        { text: '✅ 確認記錄', callback_data: `comm:confirm:${projectId}` },
+        { text: '🔄 重新生成', callback_data: `comm:regen:${projectId}` },
+      ]],
+    };
+
+    try {
+      const newMsg = await bot.sendMessage(chatId, draftText, {
+        parse_mode: 'MarkdownV2',
+        reply_markup: keyboard,
+      });
+
+      // Update message_id in session
+      await redis.set(
+        sessionKey,
+        JSON.stringify({ project_id: projectId, client_message: session.client_message, draft: newDraft, message_id: newMsg.message_id }),
+        'EX', 86400
+      ).catch(() => {});
+
+      console.log(`[telegram-bot] comm regen: project ${projectId} new draft sent`);
+    } catch (err) {
+      console.error('[telegram-bot] Failed to send regenerated draft:', err.message);
+    }
+    return;
+  }
+
+  await bot.answerCallbackQuery(query.id, { text: '無效操作' });
+}
 
 // ─── Express health endpoint ──────────────────────────────────────────────────
 

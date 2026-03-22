@@ -18,11 +18,44 @@ const {
 
 const PORT = process.env.PORT || 3005;
 const PROJECTS_ROOT = process.env.PROJECTS_ROOT || '/projects';
+const KNOWLEDGE_BASE_URL = process.env.KNOWLEDGE_BASE_URL || 'http://knowledge-base:3010';
 
 const pool = new Pool({
   connectionString: process.env.DB_URL,
   max: 10,
 });
+
+// ─── HTTP helper ──────────────────────────────────────────────────────────────
+
+const http = require('http');
+
+function httpPost(baseUrl, urlPath, body) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlPath, baseUrl);
+    const payload = JSON.stringify(body);
+    const options = {
+      hostname: url.hostname,
+      port:     url.port || 80,
+      path:     url.pathname,
+      method:   'POST',
+      headers: {
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    };
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => {
+        try { resolve({ statusCode: res.statusCode, body: JSON.parse(data) }); }
+        catch { resolve({ statusCode: res.statusCode, body: data }); }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -230,6 +263,138 @@ app.post('/bootstrap', async (req, res) => {
     });
 
     return res.status(500).json({ error: 'Bootstrap failed', message: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ── POST /complete ────────────────────────────────────────────────────────────
+/**
+ * Body: { project_id: number, outcome: 'won'|'lost', key_factors?: string, tags?: string[] }
+ *
+ * 結案流程：
+ *   1. 更新 projects.status → 'completed'
+ *   2. 呼叫 knowledge-base POST /learn（記錄學習資料）
+ *   3. 更新 leads.status → 'closed'
+ */
+app.post('/complete', async (req, res) => {
+  const startedAt = Date.now();
+  const { project_id, outcome, key_factors, tags } = req.body;
+
+  if (!project_id || typeof project_id !== 'number') {
+    return res.status(400).json({ error: 'project_id (number) is required' });
+  }
+
+  const validOutcomes = ['won', 'lost'];
+  if (!outcome || !validOutcomes.includes(outcome)) {
+    return res.status(400).json({ error: 'outcome must be "won" or "lost"' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Fetch project
+    const { rows: projects } = await client.query(
+      'SELECT * FROM projects WHERE id = $1',
+      [project_id]
+    );
+    if (projects.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: `Project ${project_id} not found` });
+    }
+    const project = projects[0];
+
+    // Update project status to completed
+    await client.query(
+      `UPDATE projects SET status = 'completed', updated_at = NOW() WHERE id = $1`,
+      [project_id]
+    );
+
+    // Update lead status to closed
+    if (project.lead_id) {
+      await client.query(
+        `UPDATE leads SET status = 'closed', status_updated_at = NOW() WHERE id = $1`,
+        [project.lead_id]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    // Fetch lead details for knowledge-base
+    let lead = null;
+    if (project.lead_id) {
+      const { rows: leadRows } = await client.query(
+        'SELECT * FROM leads WHERE id = $1',
+        [project.lead_id]
+      );
+      if (leadRows.length > 0) lead = leadRows[0];
+    }
+
+    // Extract budget from lead if available
+    const budgetMin = lead?.budget_min  ?? null;
+    const budgetMax = lead?.budget_max  ?? null;
+    const techStack = lead?.tech_stack  ?? [];
+    const category  = lead?.source      ?? null;
+
+    // Build tags: merge provided tags + tech_stack from lead
+    const allTags = [
+      ...(Array.isArray(tags) ? tags : []),
+      ...(Array.isArray(techStack) ? techStack : []),
+    ].filter((t, i, arr) => t && arr.indexOf(t) === i); // unique, non-empty
+
+    // Call knowledge-base /learn (best-effort — never fail the main response)
+    let kbResult = null;
+    try {
+      const kbResp = await httpPost(KNOWLEDGE_BASE_URL, '/learn', {
+        project_id,
+        category,
+        tags:       allTags,
+        budget_min: budgetMin,
+        budget_max: budgetMax,
+        outcome,
+        key_factors: key_factors || null,
+      });
+      kbResult = kbResp.body;
+      console.log(`[bootstrapper] /complete — knowledge-base learn id=${kbResult?.id} outcome=${outcome}`);
+    } catch (kbErr) {
+      console.error('[bootstrapper] knowledge-base /learn failed (non-fatal):', kbErr.message);
+    }
+
+    const durationMs = Date.now() - startedAt;
+
+    await logAgentAction(client, {
+      action:        'complete_project',
+      entityType:    'project',
+      entityId:      project_id,
+      status:        'success',
+      durationMs,
+      inputSummary:  `project_id=${project_id} outcome=${outcome}`,
+      outputSummary: `knowledge_base_id=${kbResult?.id ?? 'n/a'}`,
+    });
+
+    return res.json({
+      project_id,
+      status:          'completed',
+      outcome,
+      knowledge_base:  kbResult,
+    });
+
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[bootstrapper] /complete error:', err);
+
+    await logAgentAction(client, {
+      action:       'complete_project',
+      entityType:   'project',
+      entityId:     project_id,
+      status:       'failed',
+      durationMs:   Date.now() - startedAt,
+      inputSummary: `project_id=${project_id}`,
+      errorMessage: err.message,
+    });
+
+    return res.status(500).json({ error: 'Complete failed', message: err.message });
   } finally {
     client.release();
   }

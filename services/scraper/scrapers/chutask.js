@@ -9,13 +9,23 @@
  * @module scrapers/chutask
  */
 
+const { getRandomUA } = require('../user-agents');
+
 const BASE_URL = 'https://www.chutask.com.tw';
 const LISTING_URL = `${BASE_URL}/tasks`;
 
-const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-  'Chrome/122.0.0.0 Safari/537.36';
+/** Common desktop viewport sizes to rotate through. */
+const VIEWPORTS = [
+  { width: 1920, height: 1080 },
+  { width: 1440, height: 900 },
+  { width: 1366, height: 768 },
+  { width: 1536, height: 864 },
+  { width: 1280, height: 800 },
+];
+
+function randomViewport() {
+  return VIEWPORTS[Math.floor(Math.random() * VIEWPORTS.length)];
+}
 
 /**
  * Returns a random integer between min and max (inclusive).
@@ -262,18 +272,24 @@ async function scrapeListingPage(page, pageNum) {
  * @property {string[]}    tech_stack
  */
 async function scrape(browser, limit, opts) {
-  const { delay_min_ms = 1500, delay_max_ms = 4000 } = opts || {};
+  const { delay_min_ms = 2000, delay_max_ms = 5000 } = opts || {};
 
   const results = [];
   const context = await browser.newContext({
-    userAgent: USER_AGENT,
+    userAgent: getRandomUA(),
     locale: 'zh-TW',
+    viewport: randomViewport(),
     extraHTTPHeaders: {
       'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
     },
   });
 
   const page = await context.newPage();
+
+  // Remove navigator.webdriver fingerprint
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
 
   try {
     let pageNum = 1;

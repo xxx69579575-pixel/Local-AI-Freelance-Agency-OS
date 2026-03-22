@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>接案 OS — 知識庫</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+    }
+
+    header h1 { font-size: 18px; font-weight: 600; color: #a78bfa; }
+
+    nav a {
+      color: #64748b;
+      text-decoration: none;
+      font-size: 13px;
+      margin-left: 16px;
+    }
+    nav a:hover { color: #a78bfa; }
+
+    #error-banner {
+      display: none;
+      background: #7f1d1d;
+      color: #fca5a5;
+      padding: 10px 24px;
+      font-size: 13px;
+    }
+
+    .main { padding: 20px 24px; }
+
+    /* ─── Stats bar ──────────────────────────────── */
+    .stats-section { margin-bottom: 24px; }
+    .stats-section h2 { font-size: 14px; color: #94a3b8; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .05em; }
+
+    .outcome-bars { display: flex; flex-direction: column; gap: 8px; max-width: 400px; }
+
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .bar-label { width: 80px; color: #cbd5e1; flex-shrink: 0; }
+    .bar-track {
+      flex: 1;
+      height: 14px;
+      background: #2d3148;
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 7px;
+      transition: width .4s ease;
+    }
+    .bar-fill.won    { background: #22c55e; }
+    .bar-fill.lost   { background: #ef4444; }
+    .bar-fill.pending{ background: #f59e0b; }
+    .bar-count { width: 32px; text-align: right; color: #94a3b8; flex-shrink: 0; }
+
+    /* ─── Filter bar ──────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .filter-btn {
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid #2d3148;
+      background: transparent;
+      color: #94a3b8;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .filter-btn:hover { border-color: #a78bfa; color: #a78bfa; }
+    .filter-btn.active { background: #a78bfa; border-color: #a78bfa; color: #fff; }
+
+    .tag-filter-input {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid #2d3148;
+      background: #1a1d27;
+      color: #e2e8f0;
+      font-size: 13px;
+      width: 200px;
+    }
+    .tag-filter-input:focus { outline: none; border-color: #a78bfa; }
+    .tag-filter-input::placeholder { color: #475569; }
+
+    .filter-apply-btn {
+      padding: 5px 14px;
+      border-radius: 6px;
+      border: none;
+      background: #4f46e5;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .filter-apply-btn:hover { background: #6366f1; }
+
+    /* ─── Records table ──────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 10px 12px;
+      color: #64748b;
+      border-bottom: 1px solid #2d3148;
+      white-space: nowrap;
+    }
+
+    tbody tr { border-bottom: 1px solid #1e2235; }
+    tbody tr:hover { background: #1a1d27; }
+
+    td { padding: 10px 12px; vertical-align: top; }
+
+    .outcome-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .outcome-badge.won     { background: #14532d; color: #86efac; }
+    .outcome-badge.lost    { background: #7f1d1d; color: #fca5a5; }
+    .outcome-badge.pending { background: #451a03; color: #fcd34d; }
+
+    .tag-chip {
+      display: inline-block;
+      padding: 2px 7px;
+      background: #2d3148;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #a5b4fc;
+      margin: 1px 2px;
+      cursor: pointer;
+    }
+    .tag-chip:hover { background: #3730a3; }
+
+    .key-factors-cell {
+      max-width: 280px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    .budget-cell { white-space: nowrap; }
+
+    /* ─── Pagination ──────────────────────────────── */
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 20px;
+      justify-content: center;
+    }
+
+    .page-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid #2d3148;
+      background: transparent;
+      color: #94a3b8;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .page-btn:hover:not(:disabled) { border-color: #a78bfa; color: #a78bfa; }
+    .page-btn:disabled { opacity: 0.4; cursor: default; }
+    .page-btn.current { background: #a78bfa; border-color: #a78bfa; color: #fff; }
+
+    #page-info { font-size: 13px; color: #64748b; }
+
+    /* ─── Empty state ──────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 0;
+      color: #475569;
+    }
+    .empty-state p { margin-top: 8px; font-size: 14px; }
+
+    /* ─── Loading ──────────────────────────────── */
+    .loading { text-align: center; padding: 40px; color: #64748b; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>知識庫 — 過往案件學習</h1>
+  <nav>
+    <a href="/">Kanban</a>
+    <a href="/approval-queue.html">審核佇列</a>
+    <a href="/task-governance.html">任務治理</a>
+    <a href="/knowledge-base.html" style="color:#a78bfa">知識庫</a>
+  </nav>
+</header>
+
+<div id="error-banner"></div>
+
+<div class="main">
+
+  <!-- Outcome statistics -->
+  <div class="stats-section">
+    <h2>成效統計</h2>
+    <div class="outcome-bars" id="outcome-bars">
+      <div class="bar-row">
+        <span class="bar-label">成交 (won)</span>
+        <div class="bar-track"><div class="bar-fill won" id="bar-won" style="width:0%"></div></div>
+        <span class="bar-count" id="cnt-won">0</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">未成交</span>
+        <div class="bar-track"><div class="bar-fill lost" id="bar-lost" style="width:0%"></div></div>
+        <span class="bar-count" id="cnt-lost">0</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">待定</span>
+        <div class="bar-track"><div class="bar-fill pending" id="bar-pending" style="width:0%"></div></div>
+        <span class="bar-count" id="cnt-pending">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <button class="filter-btn active" data-outcome="">全部</button>
+    <button class="filter-btn" data-outcome="won">成交</button>
+    <button class="filter-btn" data-outcome="lost">未成交</button>
+    <button class="filter-btn" data-outcome="pending">待定</button>
+    <input
+      type="text"
+      class="tag-filter-input"
+      id="tag-input"
+      placeholder="標籤篩選，逗號分隔…"
+    />
+    <button class="filter-apply-btn" id="apply-tags">套用</button>
+  </div>
+
+  <!-- Records -->
+  <div id="records-container">
+    <div class="loading">載入中…</div>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" id="pagination" style="display:none">
+    <button class="page-btn" id="btn-prev" disabled>← 上一頁</button>
+    <span id="page-info"></span>
+    <button class="page-btn" id="btn-next">下一頁 →</button>
+  </div>
+
+</div>
+
+<script>
+  const LIMIT = 20;
+
+  let state = {
+    outcome: '',
+    tags: '',
+    page: 1,
+    totalPages: 1,
+    outcomeStats: { won: 0, lost: 0, pending: 0 },
+  };
+
+  async function fetchRecords() {
+    const params = new URLSearchParams({ page: state.page, limit: LIMIT });
+    if (state.outcome) params.set('outcome', state.outcome);
+    if (state.tags)    params.set('tags', state.tags);
+
+    const container = document.getElementById('records-container');
+    container.innerHTML = '<div class="loading">載入中…</div>';
+
+    try {
+      const resp = await fetch('/api/knowledge?' + params.toString());
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+
+      state.totalPages    = data.total_pages || 1;
+      state.outcomeStats  = data.outcome_stats || { won: 0, lost: 0, pending: 0 };
+
+      updateStats();
+      renderRecords(data.records || [], data.total || 0);
+      renderPagination(data.total || 0);
+
+      document.getElementById('error-banner').style.display = 'none';
+    } catch (err) {
+      document.getElementById('error-banner').textContent = '無法載入知識庫：' + err.message;
+      document.getElementById('error-banner').style.display = 'block';
+      container.innerHTML = '<div class="empty-state"><p>載入失敗</p></div>';
+    }
+  }
+
+  function updateStats() {
+    const s = state.outcomeStats;
+    const total = (s.won || 0) + (s.lost || 0) + (s.pending || 0);
+    const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
+
+    document.getElementById('cnt-won').textContent     = s.won || 0;
+    document.getElementById('cnt-lost').textContent    = s.lost || 0;
+    document.getElementById('cnt-pending').textContent = s.pending || 0;
+    document.getElementById('bar-won').style.width     = pct(s.won) + '%';
+    document.getElementById('bar-lost').style.width    = pct(s.lost) + '%';
+    document.getElementById('bar-pending').style.width = pct(s.pending) + '%';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function renderRecords(records, total) {
+    const container = document.getElementById('records-container');
+    if (records.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>目前知識庫沒有符合的紀錄</p></div>';
+      return;
+    }
+
+    const rows = records.map(r => {
+      const tags = (r.tags || [])
+        .map(t => `<span class="tag-chip" onclick="filterByTag('${escapeHtml(t)}')">${escapeHtml(t)}</span>`)
+        .join('');
+
+      const budget = (r.budget_min != null && r.budget_max != null)
+        ? `NT$${r.budget_min.toLocaleString()}–${r.budget_max.toLocaleString()}`
+        : '—';
+
+      const date = r.created_at
+        ? new Date(r.created_at).toLocaleDateString('zh-TW')
+        : '—';
+
+      return `
+        <tr>
+          <td>${r.id}</td>
+          <td>${escapeHtml(r.category || '—')}</td>
+          <td>${tags || '—'}</td>
+          <td class="budget-cell">${budget}</td>
+          <td><span class="outcome-badge ${r.outcome}">${outcomeLabel(r.outcome)}</span></td>
+          <td class="key-factors-cell">${escapeHtml(r.key_factors || '—')}</td>
+          <td>${date}</td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>類別</th>
+              <th>技術標籤</th>
+              <th>預算範圍</th>
+              <th>結果</th>
+              <th>關鍵因素</th>
+              <th>日期</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  function outcomeLabel(o) {
+    return { won: '成交', lost: '未成交', pending: '待定' }[o] || o;
+  }
+
+  function renderPagination(total) {
+    const pg = document.getElementById('pagination');
+    if (state.totalPages <= 1) {
+      pg.style.display = 'none';
+      return;
+    }
+    pg.style.display = 'flex';
+    document.getElementById('page-info').textContent =
+      `第 ${state.page} / ${state.totalPages} 頁（共 ${total} 筆）`;
+    document.getElementById('btn-prev').disabled = state.page <= 1;
+    document.getElementById('btn-next').disabled = state.page >= state.totalPages;
+  }
+
+  function filterByTag(tag) {
+    document.getElementById('tag-input').value = tag;
+    state.tags = tag;
+    state.page = 1;
+    fetchRecords();
+  }
+
+  // ── Event listeners ─────────────────────────────────────────────────────────
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.outcome = btn.dataset.outcome;
+      state.page = 1;
+      fetchRecords();
+    });
+  });
+
+  document.getElementById('apply-tags').addEventListener('click', () => {
+    state.tags = document.getElementById('tag-input').value.trim();
+    state.page = 1;
+    fetchRecords();
+  });
+
+  document.getElementById('tag-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('apply-tags').click();
+  });
+
+  document.getElementById('btn-prev').addEventListener('click', () => {
+    if (state.page > 1) { state.page--; fetchRecords(); }
+  });
+
+  document.getElementById('btn-next').addEventListener('click', () => {
+    if (state.page < state.totalPages) { state.page++; fetchRecords(); }
+  });
+
+  // Initial load
+  fetchRecords();
+</script>
+</body>
+</html>

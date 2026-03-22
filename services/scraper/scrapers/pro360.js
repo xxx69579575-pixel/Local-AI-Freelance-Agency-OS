@@ -16,12 +16,23 @@
  *     description, client_name, tech_stack, source }
  */
 
+const { getRandomUA } = require('../user-agents');
+
 const BASE_URL = 'https://www.pro360.com.tw';
 const LIST_URL = `${BASE_URL}/tasklist`;
-const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-  'Chrome/123.0.0.0 Safari/537.36';
+
+/** Common desktop viewport sizes to rotate through. */
+const VIEWPORTS = [
+  { width: 1920, height: 1080 },
+  { width: 1440, height: 900 },
+  { width: 1366, height: 768 },
+  { width: 1536, height: 864 },
+  { width: 1280, height: 800 },
+];
+
+function randomViewport() {
+  return VIEWPORTS[Math.floor(Math.random() * VIEWPORTS.length)];
+}
 
 /**
  * Sleep for a random duration between min and max milliseconds.
@@ -115,18 +126,24 @@ async function scrapeDetailPage(page, detailUrl) {
  * @returns {Promise<object[]>}
  */
 async function scrape(browser, limit, opts) {
-  const { delay_min_ms = 1000, delay_max_ms = 3000 } = opts || {};
+  const { delay_min_ms = 2000, delay_max_ms = 5000 } = opts || {};
   const leads = [];
 
   const context = await browser.newContext({
-    userAgent: USER_AGENT,
+    userAgent: getRandomUA(),
     locale: 'zh-TW',
+    viewport: randomViewport(),
     extraHTTPHeaders: {
       'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
     },
   });
 
   const page = await context.newPage();
+
+  // Remove navigator.webdriver fingerprint
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
 
   try {
     let pageNum = 1;

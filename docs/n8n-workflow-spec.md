@@ -27,7 +27,7 @@ Phase 1 MVP 包含 3 條主要 workflow：
         │
         ▼
 [Set: 設定抓取目標清單]
-    sources: ['pro360', 'chutask']
+    sources: ['pro360', 'chutask', '104-outsource', 'freelancer-tw']
         │
         ▼
 [Split In Batches: 逐一處理 source]
@@ -127,6 +127,18 @@ INSERT INTO leads (
 )
 RETURNING id
 ```
+
+### 多平台抓取頻率建議（Phase 5.2）
+
+| 平台 | source 識別碼 | 建議頻率 | 說明 |
+|------|---------------|----------|------|
+| PRO360 外包接案 | `pro360` | 每小時 | 台灣主力外包平台，案件量高 |
+| 出任務 | `chutask` | 每小時 | 台灣中小型任務平台 |
+| 104 外包網 | `104-outsource` | 每 2 小時 | 104 對爬蟲較敏感，降低頻率以避免封鎖 |
+| Freelancer.com | `freelancer-tw` | 每 3 小時 | 國際平台，案件更新頻率低；過快頻率易觸發 rate-limit |
+
+> **替代方案**：可改用 `POST /scrape-all` 一次呼叫合併所有平台結果，n8n 只需一個 HTTP Request 節點。
+> Body: `{ "limitPerSource": 20, "delay_min_ms": 3000, "delay_max_ms": 10000 }`
 
 ---
 

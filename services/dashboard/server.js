@@ -12,6 +12,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3003;
 const PAPERCLIP_URL = process.env.PAPERCLIP_URL || 'http://paperclip:3008';
 const DEV_DISPATCHER_URL = process.env.DEV_DISPATCHER_URL || 'http://dev-dispatcher:3006';
+const KNOWLEDGE_BASE_URL = process.env.KNOWLEDGE_BASE_URL || 'http://knowledge-base:3010';
 
 // ---------------------------------------------------------------------------
 // Generic HTTP helper for internal service calls
@@ -423,6 +424,45 @@ app.patch('/api/projects/:id/reject', async (req, res) => {
   }
 });
 
+// ─── SLA Status ───────────────────────────────────────────────────────────────
+
+// GET /api/sla-status — projects expiring within 48 h and already overdue
+app.get('/api/sla-status', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        id,
+        title,
+        client_name,
+        status,
+        due_date,
+        sla_hours,
+        version,
+        updated_at,
+        EXTRACT(EPOCH FROM (due_date - NOW())) / 3600 AS hours_remaining
+      FROM projects
+      WHERE due_date IS NOT NULL
+        AND status NOT IN ('closed', 'cancelled')
+      ORDER BY due_date ASC
+    `);
+
+    const overdue  = rows.filter(r => r.hours_remaining <= 0);
+    const warning  = rows.filter(r => r.hours_remaining > 0 && r.hours_remaining < 48);
+
+    res.json({
+      overdue_count: overdue.length,
+      warning_count: warning.length,
+      overdue,
+      warning,
+      overdue_ids: overdue.map(r => r.id),
+      warning_ids: warning.map(r => r.id),
+    });
+  } catch (err) {
+    console.error('GET /api/sla-status error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Task Governance (Paperclip proxy) ───────────────────────────────────────
 
 // GET /api/task-governance — proxy to Paperclip GET /tasks
@@ -493,6 +533,88 @@ app.post('/api/task-governance/:id/retry', async (req, res) => {
   } catch (err) {
     console.error(`POST /api/task-governance/${id}/retry error:`, err.message);
     res.status(502).json({ error: 'Service unavailable', detail: err.message });
+  }
+});
+
+// GET /api/cost-summary — aggregate token usage and cost from cost_logs
+app.get('/api/cost-summary', async (req, res) => {
+  try {
+    const [totals, byService, byDay] = await Promise.all([
+      pool.query(`
+        SELECT
+          COALESCE(SUM(prompt_tokens + completion_tokens), 0)::BIGINT AS total_tokens,
+          COALESCE(SUM(cost_usd), 0)                                   AS total_cost_usd
+        FROM cost_logs
+      `),
+      pool.query(`
+        SELECT
+          service,
+          COALESCE(SUM(prompt_tokens + completion_tokens), 0)::BIGINT AS tokens,
+          COALESCE(SUM(cost_usd), 0)                                   AS cost_usd
+        FROM cost_logs
+        GROUP BY service
+        ORDER BY tokens DESC
+      `),
+      pool.query(`
+        SELECT
+          DATE(created_at AT TIME ZONE 'UTC') AS day,
+          COALESCE(SUM(prompt_tokens + completion_tokens), 0)::BIGINT AS tokens,
+          COALESCE(SUM(cost_usd), 0)                                   AS cost_usd
+        FROM cost_logs
+        GROUP BY day
+        ORDER BY day DESC
+        LIMIT 30
+      `),
+    ]);
+
+    res.json({
+      total_tokens:   parseInt(totals.rows[0].total_tokens,  10),
+      total_cost_usd: parseFloat(totals.rows[0].total_cost_usd),
+      by_service: byService.rows.map(r => ({
+        service:  r.service,
+        tokens:   parseInt(r.tokens,   10),
+        cost_usd: parseFloat(r.cost_usd),
+      })),
+      by_day: byDay.rows.map(r => ({
+        day:      r.day,
+        tokens:   parseInt(r.tokens,   10),
+        cost_usd: parseFloat(r.cost_usd),
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/cost-summary error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Knowledge Base proxy ─────────────────────────────────────────────────────
+
+// GET /api/knowledge — proxy to knowledge-base GET /knowledge
+app.get('/api/knowledge', async (req, res) => {
+  const params = new URLSearchParams();
+  if (req.query.outcome) params.set('outcome', req.query.outcome);
+  if (req.query.tags)    params.set('tags',    req.query.tags);
+  if (req.query.page)    params.set('page',    req.query.page);
+  if (req.query.limit)   params.set('limit',   req.query.limit);
+
+  const urlPath = `/knowledge${params.toString() ? '?' + params.toString() : ''}`;
+  try {
+    const result = await serviceRequest('GET', KNOWLEDGE_BASE_URL, urlPath);
+    res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error('GET /api/knowledge error:', err.message);
+    res.status(502).json({ error: 'knowledge-base unavailable', detail: err.message });
+  }
+});
+
+// POST /api/knowledge/learn — proxy to knowledge-base POST /learn
+app.post('/api/knowledge/learn', async (req, res) => {
+  try {
+    const result = await serviceRequest('POST', KNOWLEDGE_BASE_URL, '/learn', req.body);
+    res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error('POST /api/knowledge/learn error:', err.message);
+    res.status(502).json({ error: 'knowledge-base unavailable', detail: err.message });
   }
 });
 

@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const express = require('express');
 const fetch = require('node-fetch');
+const { Pool } = require('pg');
 const { buildScoringPrompt } = require('./prompt');
 const { buildQuotationPrompt } = require('./quotation');
 
@@ -13,6 +14,53 @@ app.use(express.json());
 const PORT = process.env.PORT || 3002;
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://ollama:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2';
+const KNOWLEDGE_BASE_URL = process.env.KNOWLEDGE_BASE_URL || 'http://knowledge-base:3010';
+
+// ---------------------------------------------------------------------------
+// Fetch similar historical cases from knowledge-base service (best-effort)
+// ---------------------------------------------------------------------------
+async function fetchSimilarCases(techStack) {
+  const tags = Array.isArray(techStack)
+    ? techStack
+    : typeof techStack === 'string' && techStack
+      ? techStack.split(',').map(t => t.trim()).filter(Boolean)
+      : [];
+
+  if (tags.length === 0) return [];
+
+  try {
+    const resp = await fetch(
+      `${KNOWLEDGE_BASE_URL}/suggest?tags=${encodeURIComponent(tags.join(','))}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return data.suggestions || [];
+  } catch {
+    // knowledge-base is optional — never fail scoring because of it
+    return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DB pool for cost logging (optional — if DB_URL not set, logging is skipped)
+// ---------------------------------------------------------------------------
+const pool = process.env.DB_URL ? new Pool({ connectionString: process.env.DB_URL }) : null;
+
+/**
+ * Fire-and-forget: write a cost_logs row after an Ollama call.
+ * ollamaData: the parsed JSON response from /api/chat
+ */
+function logCost(service, ollamaData) {
+  if (!pool) return;
+  const promptTokens     = ollamaData?.prompt_eval_count     || 0;
+  const completionTokens = ollamaData?.eval_count            || 0;
+  pool.query(
+    `INSERT INTO cost_logs (service, model, prompt_tokens, completion_tokens, cost_usd)
+     VALUES ($1, $2, $3, $4, 0)`,
+    [service, OLLAMA_MODEL, promptTokens, completionTokens]
+  ).catch((err) => console.error('[scorer] cost_logs insert failed:', err.message));
+}
 
 // ---------------------------------------------------------------------------
 // GET /health
@@ -37,7 +85,13 @@ app.post('/score', async (req, res) => {
     return res.status(400).json({ error: 'lead_id is required' });
   }
 
-  const { system, user } = buildScoringPrompt({ title, description, budget_raw, tech_stack });
+  // Fetch similar historical cases (best-effort, does not block on failure)
+  const similarCases = await fetchSimilarCases(tech_stack);
+  if (similarCases.length > 0) {
+    console.log(`[scorer] lead_id=${lead_id} — injecting ${similarCases.length} similar case(s) into prompt`);
+  }
+
+  const { system, user } = buildScoringPrompt({ title, description, budget_raw, tech_stack, similarCases });
 
   const startMs = Date.now();
 
@@ -78,6 +132,8 @@ app.post('/score', async (req, res) => {
   }
 
   // Ollama /api/chat returns { message: { content: "..." }, ... }
+  logCost('scorer', ollamaData);
+
   const rawContent = ollamaData?.message?.content || '';
 
   let scoring;
@@ -170,6 +226,8 @@ app.post('/quotation', async (req, res) => {
   } catch (err) {
     return res.status(502).json({ error: 'Failed to parse Ollama response as JSON' });
   }
+
+  logCost('quotation', ollamaData);
 
   const rawContent = ollamaData?.message?.content || '';
 

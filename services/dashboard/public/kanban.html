@@ -235,6 +235,25 @@
       font-size: 14px;
     }
 
+    /* SLA Warning */
+    .card.sla-warning {
+      border-left: 3px solid #f97316;
+    }
+
+    .card.sla-overdue {
+      border-left: 3px solid #ef4444;
+    }
+
+    .sla-badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .sla-badge-warning { background: #431407; color: #fb923c; }
+    .sla-badge-overdue { background: #450a0a; color: #fca5a5; }
+
     /* Agent Status Panel */
     #agent-status-panel {
       display: flex;
@@ -339,6 +358,10 @@
     <div class="kpi-card-label">轉換率</div>
     <div class="kpi-card-value accent-orange" id="kpi-conv">—</div>
   </div>
+  <div class="kpi-card">
+    <div class="kpi-card-label">本月 tokens</div>
+    <div class="kpi-card-value accent-cyan" id="kpi-tokens">—</div>
+  </div>
 </div>
 
 <div id="agent-status-panel">
@@ -354,6 +377,10 @@
 <div class="board" id="board" style="display:none"></div>
 
 <script>
+// SLA state (refreshed alongside kanban)
+let slaOverdueIds = new Set();
+let slaWarningIds = new Set();
+
 const COLUMNS = [
   { key: 'new',                   label: '新案件' },
   { key: 'scoring',               label: 'AI 評估中' },
@@ -392,12 +419,23 @@ function renderCard(lead) {
     lead.profit_score != null ? `<span class="score-pill score-profit">P${lead.profit_score}</span>` : '',
   ].join('');
 
+  let slaClass = '';
+  let slaBadge = '';
+  if (slaOverdueIds.has(lead.id)) {
+    slaClass = ' sla-overdue';
+    slaBadge = '<span class="sla-badge sla-badge-overdue">逾期</span>';
+  } else if (slaWarningIds.has(lead.id)) {
+    slaClass = ' sla-warning';
+    slaBadge = '<span class="sla-badge sla-badge-warning">即將逾期</span>';
+  }
+
   return `
-    <div class="card" title="${escHtml(lead.title)}">
+    <div class="card${slaClass}" title="${escHtml(lead.title)}">
       <div class="card-title">${escHtml(lead.title)}</div>
       <div class="card-meta">
         <span class="badge badge-source">${escHtml(lead.source)}</span>
         ${scores}
+        ${slaBadge}
       </div>
       <div class="card-date">${fmtDate(lead.scraped_at)}</div>
     </div>
@@ -458,14 +496,28 @@ async function fetchAndRender() {
 
 async function fetchKpi() {
   try {
-    const res = await fetch('/api/kpi');
-    if (!res.ok) return;
-    const d = await res.json();
-    document.getElementById('kpi-new-leads').textContent = d.new_leads       ?? '—';
-    document.getElementById('kpi-ai-rec').textContent    = d.ai_recommended  ?? '—';
-    document.getElementById('kpi-quotes').textContent    = d.quotes_sent      ?? '—';
-    document.getElementById('kpi-deals').textContent     = d.deals_won        ?? '—';
-    document.getElementById('kpi-conv').textContent      = d.conversion_rate != null ? d.conversion_rate + '%' : '—';
+    const [kpiRes, costRes] = await Promise.all([
+      fetch('/api/kpi'),
+      fetch('/api/cost-summary'),
+    ]);
+
+    if (kpiRes.ok) {
+      const d = await kpiRes.json();
+      document.getElementById('kpi-new-leads').textContent = d.new_leads       ?? '—';
+      document.getElementById('kpi-ai-rec').textContent    = d.ai_recommended  ?? '—';
+      document.getElementById('kpi-quotes').textContent    = d.quotes_sent      ?? '—';
+      document.getElementById('kpi-deals').textContent     = d.deals_won        ?? '—';
+      document.getElementById('kpi-conv').textContent      = d.conversion_rate != null ? d.conversion_rate + '%' : '—';
+    }
+
+    if (costRes.ok) {
+      const c = await costRes.json();
+      const tokensEl = document.getElementById('kpi-tokens');
+      if (tokensEl) {
+        const t = c.total_tokens ?? 0;
+        tokensEl.textContent = t >= 1000 ? (t / 1000).toFixed(1) + 'K' : String(t);
+      }
+    }
   } catch (_) { /* non-fatal */ }
 }
 
@@ -504,6 +556,16 @@ async function fetchAgentStatus() {
   }
 }
 
+async function fetchSlaStatus() {
+  try {
+    const res = await fetch('/api/sla-status');
+    if (!res.ok) return;
+    const d = await res.json();
+    slaOverdueIds = new Set(d.overdue_ids || []);
+    slaWarningIds = new Set(d.warning_ids || []);
+  } catch (_) {}
+}
+
 async function fetchApprovalBadge() {
   try {
     const res = await fetch('/api/approval-queue');
@@ -534,12 +596,13 @@ async function fetchTaskGovernanceBadge() {
   } catch (_) {}
 }
 
-fetchAndRender();
+// Load SLA data first so card rendering picks up the right classes
+fetchSlaStatus().then(fetchAndRender);
 fetchKpi();
 fetchAgentStatus();
 fetchApprovalBadge();
 fetchTaskGovernanceBadge();
-setInterval(fetchAndRender, 30000);
+setInterval(async () => { await fetchSlaStatus(); await fetchAndRender(); }, 30000);
 setInterval(fetchKpi, 30000);
 setInterval(fetchAgentStatus, 30000);
 setInterval(fetchApprovalBadge, 30000);

@@ -149,6 +149,7 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - NOTIFY_POLL_INTERVAL_MS=${NOTIFY_POLL_INTERVAL_MS:-30000}
+      - COMM_ASSISTANT_URL=http://comm-assistant:3009
     networks:
       - agency-net
     depends_on:
@@ -156,6 +157,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      comm-assistant:
+        condition: service_started
 
   # ─── Ollama Scorer Service ────────────────────────────────────
   ollama-scorer:
@@ -171,10 +174,16 @@ services:
       - PORT=3002
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - KNOWLEDGE_BASE_URL=http://knowledge-base:3010
     networks:
       - agency-net
     depends_on:
       ollama:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      knowledge-base:
         condition: service_started
 
   # ─── Project Bootstrapper ────────────────────────────────────
@@ -191,6 +200,7 @@ services:
       - PORT=3005
       - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - PROJECTS_ROOT=/projects
+      - KNOWLEDGE_BASE_URL=http://knowledge-base:3010
     volumes:
       - ./projects:/projects
     networks:
@@ -198,6 +208,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      knowledge-base:
+        condition: service_started
 
   # ─── Dev Agent Dispatcher ─────────────────────────────────────
   dev-dispatcher:
@@ -250,6 +262,30 @@ services:
       paperclip:
         condition: service_started
 
+  # ─── Comm Assistant ───────────────────────────────────────────
+  comm-assistant:
+    build:
+      context: ./services/comm-assistant
+      dockerfile: Dockerfile
+    container_name: agency-comm-assistant
+    restart: unless-stopped
+    ports:
+      - "3009:3009"
+    environment:
+      - NODE_ENV=production
+      - PORT=3009
+      - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - PROJECTS_ROOT=/projects
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+    volumes:
+      - ./projects:/projects
+    networks:
+      - agency-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # ─── Paperclip Task Registry ──────────────────────────────────
   paperclip:
     build:
@@ -262,6 +298,25 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3008
+      - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    networks:
+      - agency-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─── Knowledge Base ───────────────────────────────────────────
+  knowledge-base:
+    build:
+      context: ./services/knowledge-base
+      dockerfile: Dockerfile
+    container_name: agency-knowledge-base
+    restart: unless-stopped
+    ports:
+      - "3010:3010"
+    environment:
+      - NODE_ENV=production
+      - PORT=3010
       - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     networks:
       - agency-net
@@ -284,10 +339,13 @@ services:
       - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - PAPERCLIP_URL=http://paperclip:3008
       - DEV_DISPATCHER_URL=http://dev-dispatcher:3006
+      - KNOWLEDGE_BASE_URL=http://knowledge-base:3010
     networks:
       - agency-net
     depends_on:
       postgres:
         condition: service_healthy
       paperclip:
+        condition: service_started
+      knowledge-base:
         condition: service_started

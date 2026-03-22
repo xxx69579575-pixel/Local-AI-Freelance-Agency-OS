@@ -6,7 +6,7 @@ Phase 1 MVP contains 3 workflows. Import them in the order listed.
 
 | File | ID | Trigger | Purpose |
 |------|----|---------|---------|
-| `WF-01-lead-scraper.json` | WF-01 | Cron (every hour, Asia/Taipei) | Scrape pro360 + chutask → score → notify queue |
+| `WF-01-lead-scraper.json` | WF-01 | Cron (every hour, Asia/Taipei) | Scrape pro360 + chutask + 104-outsource + freelancer-tw → score → notify queue |
 | `WF-02-telegram-notifier.json` | WF-02 | Schedule (every 5 min) | Poll Redis queue → send Telegram inline-keyboard cards |
 | `WF-03-decision-handler.json` | WF-03 | Webhook POST `/webhook/telegram-decision` | Route quote / reject / later → update DB + reply Telegram |
 
