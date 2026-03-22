@@ -18,9 +18,9 @@ export declare function getTask(taskId: string): TaskRecord | undefined;
 export declare function listTasks(): TaskRecord[];
 /**
  * Handle WaitingForInputError thrown during task execution:
- * save context and transition to WAITING_INPUT.
+ * save context to memory and disk, then transition to WAITING_INPUT.
  */
-export declare function handleWaitingForInput(taskId: string, err: WaitingForInputError, contextSummary?: string): void;
+export declare function handleWaitingForInput(taskId: string, err: WaitingForInputError, contextSummary?: string): Promise<void>;
 export interface StopTaskResult {
     status: "stopped" | "cancelled" | "deleted";
     context_saved: boolean;

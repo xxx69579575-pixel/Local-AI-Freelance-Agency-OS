@@ -11,6 +11,7 @@ import type { TaskRecord, TaskStatus } from "../../types/dispatch.js";
 // In-memory task store, backed by tasks.json for persistence
 const taskStore = new Map<string, TaskRecord>();
 const TASKS_FILE = `${CONFIG.paths.dispatch}/tasks.json`;
+let initialized = false;
 
 // ---------------------------------------------------------------------------
 // Persistence
@@ -39,6 +40,7 @@ export async function loadTasks(): Promise<void> {
   } catch {
     logger.warn("tasks.json is corrupt — starting with empty store");
   }
+  initialized = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +86,7 @@ export async function createTask(
   };
 
   taskStore.set(id, record);
+  initialized = true;
   await saveTasks();
   logger.info("Task created", { id, slug, alias });
   return record;
@@ -113,23 +116,40 @@ export function updateTaskStatus(
 }
 
 export function getTask(taskId: string): TaskRecord | undefined {
+  if (!initialized) {
+    logger.warn("taskStore not initialized — call loadTasks() before getTask()");
+    return undefined;
+  }
   return taskStore.get(taskId);
 }
 
 export function listTasks(): TaskRecord[] {
+  if (!initialized) {
+    logger.warn("taskStore not initialized — call loadTasks() before listTasks()");
+    return [];
+  }
   return [...taskStore.values()];
 }
 
 /**
  * Handle WaitingForInputError thrown during task execution:
- * save context and transition to WAITING_INPUT.
+ * save context to memory and disk, then transition to WAITING_INPUT.
  */
-export function handleWaitingForInput(
+export async function handleWaitingForInput(
   taskId: string,
   err: WaitingForInputError,
   contextSummary?: string,
-): void {
+): Promise<void> {
   updateTaskStatus(taskId, "waiting_input", { context: contextSummary });
+  if (contextSummary) {
+    const record = getTask(taskId);
+    if (record) {
+      const contextPath = `${CONFIG.paths.dispatch}/${record.slug}/context.md`;
+      await writeFile(contextPath, contextSummary).catch((e: unknown) => {
+        logger.warn("Failed to write context.md", { taskId, error: (e as Error).message });
+      });
+    }
+  }
   logger.info("Task waiting for input", { taskId, sequence: err.sequence });
 }
 

@@ -87,7 +87,13 @@ ${input.description}
         raw.mvp_features,
         raw.nice_to_have_features,
       );
+      if (mvp.length === 0) {
+        throw new Error("AI output must contain at least 1 MVP feature");
+      }
       const risks = normalizeRisks(raw.risks);
+      if (risks.length === 0) {
+        throw new Error("AI output must contain at least 1 risk item");
+      }
 
       // Validate dispatch_alias values in next_actions (RV-007)
       const next_actions = (raw.next_actions ?? []).map((a) => ({
@@ -95,6 +101,8 @@ ${input.description}
         dispatch_alias: validateDispatchAlias(a.dispatch_alias),
       }));
 
+      // version is intentionally fixed at "v1.0" for initial intake writes.
+      // Subsequent versions are incremented by update-spec via version-manager.
       const output: IntakeOutput = {
         project_name: raw.project_name || input.project_name,
         version: "v1.0",

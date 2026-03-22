@@ -12,6 +12,11 @@ function seqStr(seq) {
 /**
  * Write a question file atomically, then throw WaitingForInputError.
  * The calling task-runner catches this and sets status = WAITING_INPUT.
+ *
+ * Design note: WaitingForInputError is only thrown after atomicWrite resolves
+ * successfully. If atomicWrite rejects, the error propagates naturally and
+ * WaitingForInputError is never thrown — so the question-file write and the
+ * error signal are always in sync.
  */
 export async function askAndPause(taskSlug, seq, question, background, options) {
     const deadline = new Date(Date.now() + CONFIG.ipc.questionTimeoutMs).toISOString();

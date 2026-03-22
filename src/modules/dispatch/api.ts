@@ -22,12 +22,13 @@ import type { TaskRecord } from "../../types/dispatch.js";
 
 async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    let data = "";
+    const chunks: Buffer[] = [];
     req.on("data", (chunk: Buffer) => {
-      data += chunk.toString();
+      chunks.push(chunk);
     });
     req.on("end", () => {
       try {
+        const data = Buffer.concat(chunks).toString();
         resolve(data ? (JSON.parse(data) as Record<string, unknown>) : {});
       } catch {
         reject(new Error("Invalid JSON body"));
@@ -58,6 +59,19 @@ interface PendingQuestion {
   sequence: number;
   question: string;
   deadline: string;
+}
+
+/**
+ * If the task has a pending question whose deadline has passed, mark it as timed_out.
+ * Encapsulates the write side-effect so the GET handler remains read-oriented.
+ */
+async function maybeMarkTimedOut(
+  taskId: string,
+  pending_question: PendingQuestion | null,
+): Promise<void> {
+  if (pending_question && new Date() > new Date(pending_question.deadline)) {
+    updateTaskStatus(taskId, "timed_out");
+  }
 }
 
 async function getPendingQuestion(slug: string): Promise<PendingQuestion | null> {
@@ -165,13 +179,7 @@ export async function handleDispatchRequest(
     let pending_question: PendingQuestion | null = null;
     if (task.status === "waiting_input") {
       pending_question = await getPendingQuestion(task.slug);
-      // Detect timed_out
-      if (pending_question) {
-        const timedOut = new Date() > new Date(pending_question.deadline);
-        if (timedOut) {
-          updateTaskStatus(taskId, "timed_out");
-        }
-      }
+      await maybeMarkTimedOut(taskId, pending_question);
     }
 
     send(res, 200, { ...task, task_id: task.id, pending_question });

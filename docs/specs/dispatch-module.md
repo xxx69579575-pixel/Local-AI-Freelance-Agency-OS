@@ -1,4 +1,4 @@
-<!-- 版本：v1.1 | 更新日期：2026-03-22 -->
+<!-- 版本：v1.2 | 更新日期：2026-03-22 -->
 <!-- Changelog：
 - 解決審查問題 RV-009（阻擋）：正式定義任務 slug 生成演算法（含特殊字元、中文、碰撞處理）
 - 解決審查問題 RV-010（阻擋）：明確 worker 執行環境為 Claude agent；以事件驅動式 IPC 取代 sleep-polling
@@ -6,11 +6,15 @@
 - 解決審查問題 RV-015（警告）：AC-11 改為文件規範約束，移出 AC 表格
 - 採納建議 RV-016：補充 DELETE API 對 done/failed 任務的行為
 - 採納建議 RV-017：定義 .answer 文件完整性確認協議
+- v1.2：解決警告-04（GET /tasks/:id 讀取語義說明：timed_out 偵測為被動偵測，無寫入副作用）
+- v1.2：解決警告-05（§3.4 askAndPause 前置條件：atomicWrite 必須成功後才拋出 WaitingForInputError）
+- v1.2：新增 §4.6 安全規格 SEC-002（X-API-Key Header 驗證）
+- v1.2：新增 §4.7 速率限制規格 SEC-004（max 60 req/min per IP）
 -->
 
 # 任務派遣與追蹤模組規格文件 — dispatch-module
 
-> **文件版本**：v1.1
+> **文件版本**：v1.2
 > **建立日期**：2026-03-22
 > **更新日期**：2026-03-22
 > **方法論**：SDD（Spec-Driven Development）
@@ -298,8 +302,19 @@ Response 201:
   "plan_path": ".dispatch/tasks/write-spec-agency-os/plan.md"
 }
 
-# 查詢任務狀態
+# 查詢任務狀態（純讀取端點）
 GET /api/dispatch/tasks/:task_id
+
+# 警告-04 解決（讀取語義）：
+# 此端點為純讀取（GET 語義），不應產生任何寫入副作用。
+# timed_out 狀態偵測採用「被動偵測」設計：
+#   - API handler 讀取任務記錄時，若 status 為 waiting_input 且
+#     question 的 deadline 已過期，可在回應中附加 timed_out: true 旗標，
+#     但不應在此端點更新 taskStore 的 status 欄位。
+#   - timed_out 狀態的正式寫入應由 PATCH /api/dispatch/tasks/:task_id
+#     端點（或 task-runner 的輪詢/重啟路徑）負責，以符合 HTTP 語義。
+# 短期替代方案：若尚未實作 PATCH，可改用：
+#   POST /api/dispatch/tasks/:task_id/check  →  檢查並更新 timed_out 狀態
 
 Response 200:
 {
@@ -440,10 +455,17 @@ async function writeQuestion(taskSlug: string, seq: number, content: string): Pr
 
 // 提問並停止（取代原 sleep-polling 的 waitForAnswer）
 // 呼叫後 worker 應立即儲存 context 並結束執行
+//
+// 警告-05 解決（前置條件）：
+// 1. writeQuestion() 必須成功完成（原子寫入完成且無 IO 錯誤），才可繼續後續步驟
+// 2. saveContext() 必須成功完成（context.md 寫入確認），才可拋出 WaitingForInputError
+// 若任一步驟失敗（拋出 Error），函式應向上傳播原始錯誤，不拋出 WaitingForInputError，
+// 讓 task-runner 將任務狀態標記為 FAILED（而非 WAITING_INPUT），
+// 確保問題文件存在且 context 已持久化後，worker 才正式進入等待狀態。
 async function askAndPause(taskSlug: string, seq: number, content: string): Promise<never> {
-  await writeQuestion(taskSlug, seq, content);
-  await saveContext(taskSlug);
-  throw new WaitingForInputError(seq);  // task-runner 捕捉此 error，轉換狀態為 WAITING_INPUT
+  await writeQuestion(taskSlug, seq, content);  // 前置條件 1：原子寫入必須成功
+  await saveContext(taskSlug);                   // 前置條件 2：context 持久化必須成功
+  throw new WaitingForInputError(seq);           // task-runner 捕捉此 error，轉換狀態為 WAITING_INPUT
 }
 
 // Worker 重啟時：檢查是否有待處理的回答（非 sleep-polling，僅單次讀取）
@@ -488,6 +510,135 @@ async function markItemQuestion(planPath: string, index: number, question: strin
 async function markItemError(planPath: string, index: number, error: string): Promise<void>
 ```
 
+### 4.6 安全規格 — API 身份驗證（SEC-002）
+
+> **SEC-002**：所有 `/api/dispatch/*` 及 `/api/intake` 端點必須驗證請求的身份，以防止未授權存取造成 Anthropic API 費用濫用或任務資料外洩。
+
+**驗證機制：X-API-Key Header**
+
+```
+# 每個受保護端點的請求必須包含：
+X-API-Key: <token>
+
+# token 值從環境變數讀取：
+AGENCY_API_KEY=<secret>
+```
+
+**實作規範：**
+
+```typescript
+// 中介層（middleware）：在所有 /api/* 路由前執行
+function requireApiKey(req: IncomingMessage, res: ServerResponse, next: () => void): void {
+  const expectedKey = process.env.AGENCY_API_KEY;
+
+  // 若環境變數未設定，拒絕所有請求（fail-secure 原則）
+  if (!expectedKey) {
+    res.writeHead(503, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "error", message: "API key not configured" }));
+    return;
+  }
+
+  const providedKey = req.headers["x-api-key"];
+  if (!providedKey || providedKey !== expectedKey) {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "error", message: "Unauthorized" }));
+    return;
+  }
+
+  next();
+}
+```
+
+**回應規格：**
+
+| 情境 | HTTP 狀態碼 | 回應 body |
+|------|------------|----------|
+| 缺少 X-API-Key Header | 401 | `{"status":"error","message":"Unauthorized"}` |
+| X-API-Key 值錯誤 | 401 | `{"status":"error","message":"Unauthorized"}` |
+| AGENCY_API_KEY 環境變數未設定 | 503 | `{"status":"error","message":"API key not configured"}` |
+
+**部署注意事項：**
+
+- `AGENCY_API_KEY` 必須設定於 Vercel 環境變數（不可寫入程式碼或 `.env` 後提交至 git）
+- 短期過渡期：若尚未設定 `AGENCY_API_KEY`，服務僅監聽 `127.0.0.1`（本機限制），拒絕外部連線
+- 金鑰長度建議：最少 32 字元隨機字串（`openssl rand -hex 32`）
+
+### 4.7 速率限制規格（SEC-004）
+
+> **SEC-004**：為防止 DoS 攻擊與 Anthropic API 費用濫用，所有 `/api/*` 端點必須實作速率限制。
+
+**速率限制規則：**
+
+| 參數 | 值 |
+|------|---|
+| 限制單位 | per IP address |
+| 最大請求數 | 60 req/min |
+| 計算視窗 | Sliding window（滑動視窗，非固定視窗） |
+| 超限回應碼 | 429 Too Many Requests |
+
+**實作規範：**
+
+```typescript
+// 速率限制中介層（在 requireApiKey 之後執行）
+interface RateLimitEntry {
+  timestamps: number[];  // 最近 60 秒內的請求時間戳（ms）
+}
+
+const rateLimitMap = new Map<string, RateLimitEntry>();
+const WINDOW_MS = 60 * 1000;   // 60 秒
+const MAX_REQUESTS = 60;        // 每視窗最大請求數
+
+function rateLimit(req: IncomingMessage, res: ServerResponse, next: () => void): void {
+  const ip = req.socket.remoteAddress ?? "unknown";
+  const now = Date.now();
+
+  let entry = rateLimitMap.get(ip) ?? { timestamps: [] };
+  // 移除視窗外的舊時間戳
+  entry.timestamps = entry.timestamps.filter(t => now - t < WINDOW_MS);
+
+  if (entry.timestamps.length >= MAX_REQUESTS) {
+    const oldestInWindow = entry.timestamps[0];
+    const retryAfterMs = WINDOW_MS - (now - oldestInWindow);
+    const retryAfterSec = Math.ceil(retryAfterMs / 1000);
+
+    res.writeHead(429, {
+      "Content-Type": "application/json",
+      "Retry-After": String(retryAfterSec)
+    });
+    res.end(JSON.stringify({
+      status: "error",
+      message: "Too many requests",
+      retry_after_seconds: retryAfterSec
+    }));
+    return;
+  }
+
+  entry.timestamps.push(now);
+  rateLimitMap.set(ip, entry);
+  next();
+}
+```
+
+**回應規格（超限時）：**
+
+```
+HTTP/1.1 429 Too Many Requests
+Content-Type: application/json
+Retry-After: 15
+
+{
+  "status": "error",
+  "message": "Too many requests",
+  "retry_after_seconds": 15
+}
+```
+
+**注意事項：**
+
+- `rateLimitMap` 儲存於記憶體，Serverless 環境（Vercel）中每個 function 實例各自計數，不跨實例共享
+- 若需跨實例共享（高流量場景），應改用 Redis 或 Upstash 實作分散式速率限制（Phase 5.x 範疇）
+- 定期清理 `rateLimitMap` 中無效條目（如：最後請求時間超過 5 分鐘的 IP）以防止記憶體洩漏
+
 ---
 
 ## 5. 驗收標準（Acceptance Criteria）
@@ -512,6 +663,12 @@ async function markItemError(planPath: string, index: number, error: string): Pr
 ---
 
 ## Changelog
+
+### v1.2 — 2026-03-22
+- 解決警告-04（§4.2 GET /tasks/:id 讀取語義）：補充說明 timed_out 偵測為被動偵測（僅在回應附加旗標），正式狀態更新應由 PATCH 端點或 task-runner 重啟路徑負責，GET 端點不應有寫入副作用；提供 POST /tasks/:id/check 替代方案說明
+- 解決警告-05（§4.4 askAndPause 前置條件）：補充說明 writeQuestion() 和 saveContext() 必須各自成功後才可拋出 WaitingForInputError；任一步驟失敗應向上傳播原始錯誤（FAILED 狀態），確保原子性
+- 新增 §4.6 安全規格 SEC-002（X-API-Key Header 驗證）：定義 AGENCY_API_KEY 環境變數讀取、401/503 回應規格、fail-secure 原則與部署注意事項
+- 新增 §4.7 速率限制規格 SEC-004（max 60 req/min per IP）：定義 sliding window 演算法、429 + Retry-After 回應規格、記憶體實作注意事項與 Serverless 限制說明
 
 ### v1.1 — 2026-03-22
 - 解決 RV-009（阻擋）：在 § 3.1.1 正式定義 slug 生成演算法，包含 context-kebab 轉換、中文移除、alias-only fallback、碰撞時附加時間戳

@@ -1,4 +1,4 @@
-<!-- 版本：v1.1 | 更新日期：2026-03-22 -->
+<!-- 版本：v1.2 | 更新日期：2026-03-22 -->
 <!-- Changelog：
 - 解決審查問題 RV-001、RV-002（阻擋）：定義 CLI 觸發時 project_name 自動提取邏輯與 fallback；定義非 ASCII slug 處理策略與碰撞解決
 - 解決審查問題 RV-003、RV-004、RV-005（警告）：補充複雜度表資料來源；明確 AC-06 為覆蓋行為；Prompt 加入 budget；定義重試機制
@@ -6,11 +6,14 @@
 - 採納建議 RV-007：NextAction.dispatch_alias 加入驗證說明
 - 採納建議 RV-008：澄清 IntakeOutput.version 為 intake 文件版本
 - 連帶解決 RV-025（跨模組警告）：輸出文件加入 YAML frontmatter，定義 write-spec 讀取協議
+- v1.2：解決警告-03（§4.4 模型統一為 opus，與 dispatch alias 表一致）
+- v1.2：解決警告-02（§3.4 version 欄位設計說明：parser 固定輸出 v1.0，後續由 update-spec + version-manager 遞增）
+- v1.2：補充 AC-10（mvp_features 最少 1 項）、AC-11（risks 最少 1 項）
 -->
 
 # 客戶需求訪談模組規格文件 — intake-module
 
-> **文件版本**：v1.1
+> **文件版本**：v1.2
 > **建立日期**：2026-03-22
 > **更新日期**：2026-03-22
 > **方法論**：SDD（Spec-Driven Development）
@@ -133,6 +136,11 @@ intake_slug: "my-project"
 ## 六、建議實作優先順序
 ## 七、下一步行動
 ```
+
+> **警告-02 解決（SDD 設計說明）**：YAML frontmatter 中的 `version` 欄位由 `parser.ts` 在首次生成時固定輸出 `"v1.0"`。這是 SDD 流程的設計決策，非 bug：
+> - **首次生成（write-spec 觸發）**：parser 輸出 `"v1.0"`，作為 intake 文件的初始版本
+> - **後續遞增（update-spec 觸發）**：由 `update-spec` worker 呼叫 `src/modules/sdd/version-manager.ts` 中的版本遞增邏輯（如 `bumpMinor()`）來更新版本號
+> - parser.ts 不應自行遞增版本，版本管理職責屬於 `version-manager.ts`，此為模組職責分離的 SDD 設計。
 
 > **RV-003 解決**：第五章節「功能模組複雜度表」無獨立資料結構，其資料來源為 `IntakeOutput.mvp_features` 與 `nice_to_have_features` 中所有 `FeatureItem` 的 `complexity` 欄位彙整。由 `template.ts` 動態生成，格式為：
 >
@@ -291,7 +299,11 @@ src/
 
 ### 4.4 AI 處理邏輯
 
-使用 Claude API（claude-sonnet-4-6）進行需求解析。Prompt 結構：
+使用 Claude API（**claude-opus-4-6**）進行需求解析。
+
+> **警告-03 解決（模型規格統一）**：intake alias 在 dispatch-module § 3.6 Alias 對應表中指定使用 `opus` 模型。本節統一使用 `claude-opus-4-6`，與 dispatch alias 表一致，移除前版 `sonnet` 的矛盾規格。
+
+Prompt 結構：
 
 ```
 System: 你是一位資深 freelance 專案顧問，擅長分析客戶需求並輸出結構化文件。
@@ -337,10 +349,18 @@ User: 以下是客戶需求描述：
 | AC-07 | `/dispatch "intake"` 觸發後，輸出文件的 YAML frontmatter 可被後續 `write-spec` 任務直接解析 | 整合測試 |
 | AC-08 | AI 解析失敗時（API 逾時、格式錯誤），系統輸出明確錯誤訊息且不寫入空白文件；最多自動重試 2 次（共 3 次嘗試） | 錯誤注入測試 |
 | AC-09 | CLI 觸發時若 `project_name` 無法從描述中提取，系統透過 IPC 詢問用戶；若 3 分鐘無回應，使用時間戳 fallback（`project-YYYYMMDD-HHmm`） | IPC 流程測試 |
+| AC-10 | AI 解析輸出中 `mvp_features` 陣列必須包含至少 1 個 `FeatureItem`；若 AI 返回空陣列，解析失敗，觸發重試機制 | 結構驗證（mvp_features.length >= 1）|
+| AC-11 | AI 解析輸出中 `risks` 陣列必須包含至少 1 個 `RiskItem`；若 AI 返回空陣列，解析失敗，觸發重試機制 | 結構驗證（risks.length >= 1）|
 
 ---
 
 ## Changelog
+
+### v1.2 — 2026-03-22
+- 解決警告-03（§4.4 AI 模型規格統一）：將 `claude-sonnet-4-6` 改為 `claude-opus-4-6`，與 dispatch-module § 3.6 alias 對應表（`intake` → opus）保持一致
+- 解決警告-02（§3.4 version 欄位設計說明）：補充說明 parser 首次生成固定輸出 `"v1.0"`，後續版本遞增由 `update-spec` 透過 `version-manager.ts` 負責，此為 SDD 模組職責分離設計
+- 補充 AC-10（`mvp_features` 最少 1 項）：解決 QA-F4，將已實作的驗證規則正式納入驗收標準
+- 補充 AC-11（`risks` 最少 1 項）：解決 QA-F5，將已實作的驗證規則正式納入驗收標準
 
 ### v1.1 — 2026-03-22
 - 解決 RV-001（阻擋）：定義 CLI 觸發時 project_name 的三段式提取流程（AI 提取 → IPC → 時間戳 fallback）

@@ -11,23 +11,23 @@
 
 | RV-ID | 規格文件 | 章節 | 嚴重度 | 問題類型 | 問題描述 | 狀態 |
 |-------|---------|------|-------|---------|---------|------|
-| RV-001 | intake-module | 3.1 / 3.2 | **阻擋** | 模糊 | CLI 觸發格式與必填欄位衝突 | OPEN |
-| RV-002 | intake-module | 3.5 | **阻擋** | 遺漏 | Slug 未定義非 ASCII 字元處理 | OPEN |
-| RV-003 | intake-module | 3.4 / 4.1 | 警告 | 矛盾 | 輸出文件第五章節無對應資料結構 | OPEN |
-| RV-004 | intake-module | 5 AC-06 | 警告 | 不可測試 | AC-06 使用「或」導致行為未明確 | OPEN |
-| RV-005 | intake-module | 4.4 | 警告 | 遺漏 | Prompt 未含 budget 欄位且無 AI 失敗重試定義 | OPEN |
-| RV-006 | intake-module | 4.1 | 建議 | 遺漏 | FeatureItem.phase 無允許值集合 | OPEN |
-| RV-007 | intake-module | 4.1 | 建議 | 遺漏 | NextAction.dispatch_alias 未定義驗證規則 | OPEN |
-| RV-008 | intake-module | 4.1 | 建議 | 模糊 | IntakeOutput.version 與 SDD 版本控制關係未說明 | OPEN |
-| RV-009 | dispatch-module | 3.1 / 3.6 | **阻擋** | 遺漏 | 任務 slug 生成規則未定義 | OPEN |
-| RV-010 | dispatch-module | 3.4 / 4.4 | **阻擋** | 技術可行性 | Claude Code 環境下 10 秒輪詢機制不可行 | OPEN |
-| RV-011 | dispatch-module | 3.5 | 警告 | 遺漏 | 狀態機缺少 TIMED_OUT 後轉移與 PENDING→FAILED 路徑 | OPEN |
-| RV-012 | dispatch-module | 4.4 | 警告 | 技術可行性 | Windows 環境 fs.rename() 原子性未說明 | OPEN |
-| RV-013 | dispatch-module | 3.6 | 警告 | 遺漏 | Plan 模板格式及與 context 整合方式未定義 | OPEN |
-| RV-014 | dispatch-module | 4.2 / 5 AC-10 | 警告 | 矛盾 | API 回應範例缺少 failed 統計，與 AC-10 不符 | OPEN |
-| RV-015 | dispatch-module | 5 AC-11 | 警告 | 不可測試 | AC-11 為流程約束非技術強制，無法寫出明確 pass/fail 測試 | OPEN |
-| RV-016 | dispatch-module | 4.2 | 建議 | 遺漏 | DELETE API 未定義對 done/failed 任務的行為 | OPEN |
-| RV-017 | dispatch-module | 3.4 | 建議 | 遺漏 | IPC 輪詢未定義如何確認 .answer 文件已完整寫入 | OPEN |
+| RV-001 | intake-module | 3.1 / 3.2 | **阻擋** | 模糊 | CLI 觸發格式與必填欄位衝突 | RESOLVED（v1.1）|
+| RV-002 | intake-module | 3.5 | **阻擋** | 遺漏 | Slug 未定義非 ASCII 字元處理 | RESOLVED（v1.1）|
+| RV-003 | intake-module | 3.4 / 4.1 | 警告 | 矛盾 | 輸出文件第五章節無對應資料結構 | RESOLVED（v1.1）|
+| RV-004 | intake-module | 5 AC-06 | 警告 | 不可測試 | AC-06 使用「或」導致行為未明確 | RESOLVED（v1.1）|
+| RV-005 | intake-module | 4.4 | 警告 | 遺漏 | Prompt 未含 budget 欄位且無 AI 失敗重試定義 | RESOLVED（v1.1）|
+| RV-006 | intake-module | 4.1 | 建議 | 遺漏 | FeatureItem.phase 無允許值集合 | RESOLVED（v1.1）|
+| RV-007 | intake-module | 4.1 | 建議 | 遺漏 | NextAction.dispatch_alias 未定義驗證規則 | RESOLVED（v1.1）|
+| RV-008 | intake-module | 4.1 | 建議 | 模糊 | IntakeOutput.version 與 SDD 版本控制關係未說明 | RESOLVED（v1.1）|
+| RV-009 | dispatch-module | 3.1 / 3.6 | **阻擋** | 遺漏 | 任務 slug 生成規則未定義 | RESOLVED（v1.1）|
+| RV-010 | dispatch-module | 3.4 / 4.4 | **阻擋** | 技術可行性 | Claude Code 環境下 10 秒輪詢機制不可行 | RESOLVED（v1.1）|
+| RV-011 | dispatch-module | 3.5 | 警告 | 遺漏 | 狀態機缺少 TIMED_OUT 後轉移與 PENDING→FAILED 路徑 | RESOLVED（v1.1）|
+| RV-012 | dispatch-module | 4.4 | 警告 | 技術可行性 | Windows 環境 fs.rename() 原子性未說明 | RESOLVED（v1.1）|
+| RV-013 | dispatch-module | 3.6 | 警告 | 遺漏 | Plan 模板格式及與 context 整合方式未定義 | RESOLVED（v1.1）|
+| RV-014 | dispatch-module | 4.2 / 5 AC-10 | 警告 | 矛盾 | API 回應範例缺少 failed 統計，與 AC-10 不符 | RESOLVED（v1.1）|
+| RV-015 | dispatch-module | 5 AC-11 | 警告 | 不可測試 | AC-11 為流程約束非技術強制，無法寫出明確 pass/fail 測試 | RESOLVED（v1.1）|
+| RV-016 | dispatch-module | 4.2 | 建議 | 遺漏 | DELETE API 未定義對 done/failed 任務的行為 | RESOLVED（v1.1）|
+| RV-017 | dispatch-module | 3.4 | 建議 | 遺漏 | IPC 輪詢未定義如何確認 .answer 文件已完整寫入 | RESOLVED（v1.1）|
 | RV-018 | sdd-workflow | 3.2 / 4.4 | **阻擋** | 矛盾 | Spec Gate 文字條件與程式碼實作不一致（review 文件存在性） | OPEN |
 | RV-019 | sdd-workflow | 4.2 | **阻擋** | 模糊 | drift-check 實作機制完全未定義 | OPEN |
 | RV-020 | sdd-workflow | 3.6 | 警告 | 矛盾 | review-spec 同時出現於人工介入點與非介入點清單 | OPEN |
@@ -384,6 +384,23 @@ spec-parser.ts 需要同時處理兩種格式，但規格中未說明。
 M1~M5 的完整列表、每個 MVP 的定義、Phase 對應關係均無主文件記錄。
 
 **建議修正**：在 `docs/specs/` 或 `ROADMAP.md` 中加入 MVP 主列表，明確定義 M1–MN 的名稱、描述、對應 Phase。
+
+---
+
+## Phase 5.2 規格迭代更新（2026-03-22）
+
+以下問題由 QA 審查與程式碼審查（Phase 3）發現，非原始 review-spec 輸出，於 Phase 5.2 規格迭代中解決：
+
+| 問題編號 | 規格文件 | 嚴重度 | 問題描述 | 狀態 |
+|---------|---------|-------|---------|------|
+| 警告-02 | intake-module | 中 | `version` 欄位永遠硬寫 "v1.0"，不支援遞增 | RESOLVED（v1.2）— §3.4 補充 SDD 設計說明：首次生成固定 v1.0，後續由 update-spec + version-manager 負責遞增 |
+| 警告-03 | intake-module | 中 | intake 模型規格衝突（§4.4 sonnet vs dispatch alias 表 opus） | RESOLVED（v1.2）— §4.4 統一改為 claude-opus-4-6 |
+| 警告-04 | dispatch-module | 中 | GET /tasks/:id 有副作用（timed_out 狀態更新） | RESOLVED（v1.2）— §4.2 補充讀取語義說明，明確被動偵測設計；建議短期替代端點 POST /tasks/:id/check |
+| 警告-05 | dispatch-module | 中 | `askAndPause` 未儲存 context 即拋出例外 | RESOLVED（v1.2）— §4.4 補充前置條件：writeQuestion 與 saveContext 必須各自成功後才可拋出 WaitingForInputError |
+| QA-F4 | intake-module | 中 | `mvp_features` 無最少 1 項驗證（已實作但 AC 未記錄） | RESOLVED（v1.2）— 新增 AC-10 |
+| QA-F5 | intake-module | 中 | `risks` 無最少 1 項驗證（已實作但 AC 未記錄） | RESOLVED（v1.2）— 新增 AC-11 |
+| SEC-002 | dispatch-module | 高 | 所有 API 端點缺少身份驗證 | RESOLVED（v1.2）— 新增 §4.6 安全規格：X-API-Key Header 驗證、AGENCY_API_KEY 環境變數、401/503 回應規格 |
+| SEC-004 | dispatch-module | 中 | 缺少速率限制（DoS 風險） | RESOLVED（v1.2）— 新增 §4.7 速率限制規格：max 60 req/min per IP，sliding window，429 + Retry-After |
 
 ---
 

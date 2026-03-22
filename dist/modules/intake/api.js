@@ -4,6 +4,18 @@ import http from "node:http";
 import { runIntake } from "./parser.js";
 import { logger } from "../../utils/logger.js";
 /**
+ * Handle an intake API request directly (for use in a combined server).
+ */
+export function handleIntakeRequest(req, res) {
+    handleRequest(req, res).catch((err) => {
+        logger.error("Unhandled API error", { error: err.message });
+        if (!res.headersSent) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ status: "error", message: "Internal server error" }));
+        }
+    });
+}
+/**
  * Create and return an http.Server that handles intake API requests.
  * Call server.listen(port) to start.
  */

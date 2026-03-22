@@ -1,8 +1,9 @@
 // Agency OS — HTTP server entry point
-// Mounts intake and dispatch API routes, exposes health check at GET /
+// Mounts intake, dispatch, and sdd API routes, exposes health check at GET /
 import http from "node:http";
 import { handleDispatchRequest } from "./modules/dispatch/api.js";
 import { handleIntakeRequest } from "./modules/intake/api.js";
+import { handleSddRequest } from "./modules/sdd/api.js";
 import { logger } from "./utils/logger.js";
 
 export async function requestHandler(
@@ -20,6 +21,12 @@ export async function requestHandler(
       }),
     );
     return;
+  }
+
+  // SDD routes: POST /api/sdd/spec-gate, GET /api/sdd/status, etc.
+  if ((req.url ?? "").startsWith("/api/sdd")) {
+    const handled = await handleSddRequest(req, res);
+    if (handled) return;
   }
 
   // Dispatch routes: POST /api/dispatch, GET /api/dispatch/tasks, etc.

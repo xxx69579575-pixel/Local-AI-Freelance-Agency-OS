@@ -1,10 +1,14 @@
+/** Escape a value for use inside a YAML double-quoted string. */
+function yamlEscape(value) {
+    return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
 export function buildMarkdown(output, slug) {
     const frontmatter = [
         "---",
-        `project_name: "${output.project_name}"`,
-        `version: "${output.version}"`,
-        `created_at: "${output.created_at}"`,
-        `intake_slug: "${slug}"`,
+        `project_name: "${yamlEscape(output.project_name)}"`,
+        `version: "${yamlEscape(output.version)}"`,
+        `created_at: "${yamlEscape(output.created_at)}"`,
+        `intake_slug: "${yamlEscape(slug)}"`,
         "---",
     ].join("\n");
     const complexityTable = buildComplexityTable([

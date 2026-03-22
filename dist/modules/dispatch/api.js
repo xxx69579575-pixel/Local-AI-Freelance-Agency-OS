@@ -11,12 +11,13 @@ import { CONFIG } from "../../config.js";
 // ---------------------------------------------------------------------------
 async function readBody(req) {
     return new Promise((resolve, reject) => {
-        let data = "";
+        const chunks = [];
         req.on("data", (chunk) => {
-            data += chunk.toString();
+            chunks.push(chunk);
         });
         req.on("end", () => {
             try {
+                const data = Buffer.concat(chunks).toString();
                 resolve(data ? JSON.parse(data) : {});
             }
             catch {
@@ -40,6 +41,15 @@ function statusCounts(tasks) {
         waiting_input: tasks.filter((t) => t.status === "waiting_input").length,
         pending: tasks.filter((t) => t.status === "pending").length,
     };
+}
+/**
+ * If the task has a pending question whose deadline has passed, mark it as timed_out.
+ * Encapsulates the write side-effect so the GET handler remains read-oriented.
+ */
+async function maybeMarkTimedOut(taskId, pending_question) {
+    if (pending_question && new Date() > new Date(pending_question.deadline)) {
+        updateTaskStatus(taskId, "timed_out");
+    }
 }
 async function getPendingQuestion(slug) {
     const ipcDir = `${CONFIG.paths.dispatch}/${slug}/ipc`;
@@ -136,13 +146,7 @@ export async function handleDispatchRequest(req, res) {
         let pending_question = null;
         if (task.status === "waiting_input") {
             pending_question = await getPendingQuestion(task.slug);
-            // Detect timed_out
-            if (pending_question) {
-                const timedOut = new Date() > new Date(pending_question.deadline);
-                if (timedOut) {
-                    updateTaskStatus(taskId, "timed_out");
-                }
-            }
+            await maybeMarkTimedOut(taskId, pending_question);
         }
         send(res, 200, { ...task, task_id: task.id, pending_question });
         return true;
