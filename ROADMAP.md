@@ -1,6 +1,6 @@
 # Local AI Freelance Agency OS — 開發路線圖
 
-> **進度摘要：16 / 23 里程碑完成**
+> **進度摘要：19 / 23 里程碑完成**
 >
 > 最後更新：2026-03-22 | 方法論：SDD（規格驅動開發）
 
@@ -81,12 +81,12 @@
 
 **目標**：將專案成功部署至生產環境，確認服務正常運作。
 
-- [ ] **4.1** 執行 build 確認無錯誤後，推送所有變更至 GitHub
+- [x] **4.1** 執行 build 確認無錯誤後，推送所有變更至 GitHub
   → `/dispatch "build-check"` → `/dispatch "update-push"`
-- [ ] **4.2** 部署至 Vercel（主要生產環境），確認部署 URL 可正常存取
-  → `/dispatch "deploy-vercel"`
-- [ ] **4.3** （選用）部署靜態展示頁面至 GitHub Pages
-  → `/dispatch "deploy-pages"`
+- [x] **4.2** 部署至 Vercel（主要生產環境），確認部署 URL 可正常存取
+  → 🚀 https://local-ai-agency-os.vercel.app
+- [x] **4.3** （選用）部署靜態展示頁面至 GitHub Pages
+  → [skip] 純後端專案，不適用
 
 ---
 
