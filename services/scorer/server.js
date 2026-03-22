@@ -3,7 +3,7 @@
 require('dotenv').config();
 
 const express = require('express');
-const fetch = require('node-fetch');
+// Use native Node.js 20 fetch (supports AbortSignal.timeout)
 const { Pool } = require('pg');
 const { buildScoringPrompt } = require('./prompt');
 const { buildQuotationPrompt } = require('./quotation');

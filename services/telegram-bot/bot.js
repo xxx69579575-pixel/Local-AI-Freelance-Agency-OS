@@ -551,6 +551,17 @@ bot.on('callback_query', async (query) => {
   await bot.answerCallbackQuery(query.id, { text: '無效操作' });
 });
 
+// ─── /start command ───────────────────────────────────────────────────────────
+bot.onText(/^\/start/, (msg) => {
+  bot.sendMessage(msg.chat.id,
+    '✅ 金秘書 Agency OS 已連線！\n\n' +
+    '📋 Dashboard: http://localhost:3003\n' +
+    '🤖 系統會自動通知新案件、報價審核、交付確認。\n\n' +
+    '可用指令：\n' +
+    '/reply <project_id> <訊息> — AI 草擬客戶回覆'
+  );
+});
+
 // ─── Phase 5.3 — /reply command ───────────────────────────────────────────────
 //
 // Usage: /reply <project_id> <client message...>

@@ -18,7 +18,7 @@ services:
     container_name: agency-n8n
     restart: unless-stopped
     ports:
-      - "5678:5678"
+      - "5679:5678"
     environment:
       - N8N_HOST=${N8N_HOST:-0.0.0.0}
       - N8N_PORT=5678
@@ -46,24 +46,9 @@ services:
         condition: service_healthy
 
   # ─── Ollama ───────────────────────────────────────────────────
-  ollama:
-    image: ollama/ollama:latest
-    container_name: agency-ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - agency-net
-    # GPU 支援（可選，需要 nvidia container toolkit）
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+  # 已停用：使用本機 Ollama（http://host.docker.internal:11434）
+  # ollama:
+  #   image: ollama/ollama:latest
 
   # ─── PostgreSQL ───────────────────────────────────────────────
   postgres:
@@ -172,15 +157,13 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3002
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
       - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - KNOWLEDGE_BASE_URL=http://knowledge-base:3010
     networks:
       - agency-net
     depends_on:
-      ollama:
-        condition: service_started
       postgres:
         condition: service_healthy
       knowledge-base:
@@ -276,7 +259,7 @@ services:
       - PORT=3009
       - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - PROJECTS_ROOT=/projects
-      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_URL=http://host.docker.internal:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
     volumes:
       - ./projects:/projects

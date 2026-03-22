@@ -263,6 +263,5 @@
     "callerPolicy": "workflowsFromSameOwner",
     "errorWorkflow": ""
   },
-  "id": "wf-02-telegram-notifier",
-  "tags": ["phase-1", "telegram", "mvp"]
+  "id": "wf-02-telegram-notifier"
 }

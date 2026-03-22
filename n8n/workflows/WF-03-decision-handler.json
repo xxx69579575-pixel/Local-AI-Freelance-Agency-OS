@@ -395,6 +395,5 @@
     "callerPolicy": "workflowsFromSameOwner",
     "errorWorkflow": ""
   },
-  "id": "wf-03-decision-handler",
-  "tags": ["phase-1", "telegram", "webhook", "mvp"]
+  "id": "wf-03-decision-handler"
 }

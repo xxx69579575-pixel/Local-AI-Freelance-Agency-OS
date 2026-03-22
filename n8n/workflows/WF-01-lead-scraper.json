@@ -353,6 +353,5 @@
     "callerPolicy": "workflowsFromSameOwner",
     "errorWorkflow": ""
   },
-  "id": "wf-01-lead-scraper",
-  "tags": ["phase-1", "scraper", "mvp"]
+  "id": "wf-01-lead-scraper"
 }
