@@ -1,0 +1,3 @@
+read https://github.com/xxx69579575-pixel/Local-AI-Freelance-Agency-OS 執行此專案開發
+
+1.遵行 SDD (Spec-Driven Development，規格驅動開發)的開發流程
