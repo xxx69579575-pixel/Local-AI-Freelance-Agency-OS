@@ -110,3 +110,17 @@
 [2026-03-22T07:10:40.259Z] Playing notification sound: C:/Windows/Media/chimes.wav
 [2026-03-22T07:10:44.766Z] Notification sound played successfully
 [2026-03-22T07:10:44.766Z] === NOTIFICATION HOOK COMPLETED ===
+[2026-03-22T07:16:14.015Z] === NOTIFICATION HOOK STARTED ===
+[2026-03-22T07:16:14.018Z] Notification hook input received: {
+  "session_id": "08f106a3-5f0c-44d6-8131-410eb4632027",
+  "transcript_path": "C:\\Users\\xx\\.claude\\projects\\C--Users-xx-Desktop-Local-AI-Freelance-Agency-OS\\08f106a3-5f0c-44d6-8131-410eb4632027.jsonl",
+  "cwd": "C:\\Users\\xx\\Desktop\\Local-AI-Freelance-Agency-OS",
+  "hook_event_name": "Notification",
+  "message": "Claude is waiting for your input",
+  "notification_type": "idle_prompt"
+}
+[2026-03-22T07:16:14.018Z] Notification type: idle_prompt
+[2026-03-22T07:16:14.018Z] Message: Claude is waiting for your input
+[2026-03-22T07:16:14.018Z] Playing notification sound: C:/Windows/Media/chimes.wav
+[2026-03-22T07:16:18.438Z] Notification sound played successfully
+[2026-03-22T07:16:18.439Z] === NOTIFICATION HOOK COMPLETED ===
