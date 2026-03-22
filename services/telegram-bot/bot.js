@@ -7,14 +7,15 @@ const express    = require('express');
 const { Pool }   = require('pg');
 const Redis      = require('ioredis');
 
-const { formatLeadMessage, buildLeadKeyboard, escMd } = require('./formatter');
+const { formatLeadMessage, buildLeadKeyboard, formatQuoteDraft, buildQuoteKeyboard, escMd } = require('./formatter');
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-const BOT_TOKEN  = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT_ID    = process.env.TELEGRAM_CHAT_ID;
-const PORT       = parseInt(process.env.PORT || '3003', 10);
+const BOT_TOKEN    = process.env.TELEGRAM_BOT_TOKEN;
+const CHAT_ID      = process.env.TELEGRAM_CHAT_ID;
+const PORT         = parseInt(process.env.PORT || '3003', 10);
 const POLL_INTERVAL_MS = parseInt(process.env.NOTIFY_POLL_INTERVAL_MS || '30000', 10);
+const SCORER_URL   = process.env.SCORER_URL || 'http://scorer:3002';
 
 if (!BOT_TOKEN) {
   console.error('[telegram-bot] TELEGRAM_BOT_TOKEN is required');
@@ -52,13 +53,32 @@ const redis = new Redis({
 async function fetchLead(leadId) {
   const res = await db.query(
     `SELECT id, title, source, url,
-            budget_estimate, budget_raw, deadline,
-            tech_stack, risk_score, fit_score,
+            budget_estimate, budget_raw, deadline, description,
+            tech_stack, client_name, risk_score, fit_score,
             expected_profit_score, reason_summary, status
      FROM leads WHERE id = $1`,
     [leadId]
   );
   return res.rows[0] || null;
+}
+
+async function insertQuotation(leadId, draftJson) {
+  const res = await db.query(
+    `INSERT INTO quotations (lead_id, draft_content, generated_at)
+     VALUES ($1, $2, NOW())
+     RETURNING id`,
+    [leadId, JSON.stringify(draftJson)]
+  );
+  return res.rows[0].id;
+}
+
+async function approveQuotation(quotationId) {
+  await db.query(
+    `UPDATE quotations
+     SET approved_at = NOW(), final_content = draft_content
+     WHERE id = $1`,
+    [quotationId]
+  );
 }
 
 async function updateLeadStatus(leadId, newStatus) {
@@ -137,6 +157,106 @@ async function sendLeadNotification(leadId) {
   }
 }
 
+// ─── Phase 2.1 + 2.2 — sendQuoteDraftNotification ────────────────────────────
+
+/**
+ * Fetch a lead in pending_quote status, call scorer /quotation,
+ * store draft in quotations table, and send Telegram approval message.
+ */
+async function sendQuoteDraftNotification(leadId) {
+  const lead = await fetchLead(leadId);
+
+  if (!lead) {
+    console.warn(`[telegram-bot] Lead ${leadId} not found — skipping quote draft`);
+    return;
+  }
+
+  if (lead.status !== 'pending_quote') {
+    console.warn(`[telegram-bot] Lead ${leadId} has status '${lead.status}' — skipping quote draft`);
+    return;
+  }
+
+  // 1. Call scorer /quotation to generate AI draft
+  let draft;
+  try {
+    const scorerRes = await fetch(`${SCORER_URL}/quotation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lead_id:       lead.id,
+        title:         lead.title,
+        description:   lead.description,
+        budget_raw:    lead.budget_raw,
+        tech_stack:    lead.tech_stack,
+        client_name:   lead.client_name,
+        reason_summary: lead.reason_summary,
+      }),
+      signal: AbortSignal.timeout(120000),
+    });
+
+    if (!scorerRes.ok) {
+      const text = await scorerRes.text();
+      throw new Error(`Scorer returned ${scorerRes.status}: ${text}`);
+    }
+
+    draft = await scorerRes.json();
+  } catch (err) {
+    console.error(`[telegram-bot] Failed to generate quotation for lead ${leadId}:`, err.message);
+    await logAgentAction({
+      action: 'quote_draft_generated',
+      entityId: leadId,
+      status: 'failed',
+      errorMessage: err.message,
+    });
+    throw err;
+  }
+
+  // 2. Persist draft in quotations table
+  let quotationId;
+  try {
+    quotationId = await insertQuotation(leadId, draft);
+  } catch (err) {
+    console.error(`[telegram-bot] Failed to insert quotation for lead ${leadId}:`, err.message);
+    throw err;
+  }
+
+  // 3. Send draft to Telegram with approval keyboard
+  const text     = formatQuoteDraft(draft, lead);
+  const keyboard = buildQuoteKeyboard(lead.id);
+
+  try {
+    const msg = await bot.sendMessage(CHAT_ID, text, {
+      parse_mode: 'MarkdownV2',
+      reply_markup: keyboard,
+    });
+
+    // Store session: message → { lead_id, quotation_id }
+    await redis.set(
+      `telegram:quote:session:${CHAT_ID}:msg:${msg.message_id}`,
+      JSON.stringify({ lead_id: lead.id, quotation_id: quotationId }),
+      'EX', 86400
+    );
+
+    await logAgentAction({
+      action: 'quote_draft_sent',
+      entityId: lead.id,
+      status: 'success',
+      outputSummary: `quotation_id=${quotationId} message_id=${msg.message_id}`,
+    });
+
+    console.log(`[telegram-bot] Sent quote draft for lead ${lead.id} (quotation ${quotationId}, msg ${msg.message_id})`);
+  } catch (err) {
+    console.error(`[telegram-bot] Failed to send quote draft for lead ${leadId}:`, err.message);
+    await logAgentAction({
+      action: 'quote_draft_sent',
+      entityId: lead.id,
+      status: 'failed',
+      errorMessage: err.message,
+    });
+    throw err;
+  }
+}
+
 // ─── Redis queue poller ────────────────────────────────────────────────────────
 
 async function pollNotifyQueue() {
@@ -165,6 +285,31 @@ async function pollNotifyQueue() {
   }
 }
 
+async function pollQuoteQueue() {
+  let leadIdStr;
+  try {
+    leadIdStr = await redis.lpop('queue:quote');
+  } catch (err) {
+    console.error('[telegram-bot] Redis lpop (queue:quote) error:', err.message);
+    return;
+  }
+
+  if (!leadIdStr) return;
+
+  const leadId = parseInt(leadIdStr, 10);
+  if (isNaN(leadId)) {
+    console.warn(`[telegram-bot] Invalid lead_id in queue:quote: ${leadIdStr}`);
+    return;
+  }
+
+  try {
+    await sendQuoteDraftNotification(leadId);
+  } catch (err) {
+    await redis.rpush('queue:quote', leadIdStr).catch(() => {});
+    console.error(`[telegram-bot] Re-queued lead ${leadId} after quote draft failure`);
+  }
+}
+
 // ─── Phase 1.9 — callback_query handler ──────────────────────────────────────
 
 const ACTION_STATUS_MAP = {
@@ -182,66 +327,206 @@ const ACTION_CONFIRM_MSG = {
 bot.on('callback_query', async (query) => {
   const chatId    = String(query.message.chat.id);
   const messageId = query.message.message_id;
-  const data      = query.callback_data || '';
+  const data      = query.data || '';  // node-telegram-bot-api uses query.data, not query.callback_data
 
-  // Expected format: "action:<action>:<lead_id>"
   const parts = data.split(':');
-  if (parts.length !== 3 || parts[0] !== 'action') {
+  if (parts.length !== 3) {
     console.warn(`[telegram-bot] Unexpected callback_data: ${data}`);
     await bot.answerCallbackQuery(query.id, { text: '無效操作' });
     return;
   }
 
-  const [, action, leadIdStr] = parts;
+  const [namespace, action, leadIdStr] = parts;
   const leadId = parseInt(leadIdStr, 10);
 
-  if (!ACTION_STATUS_MAP[action] || isNaN(leadId)) {
-    console.warn(`[telegram-bot] Unknown action '${action}' or invalid lead_id '${leadIdStr}'`);
+  if (isNaN(leadId)) {
+    console.warn(`[telegram-bot] Invalid lead_id in callback: ${leadIdStr}`);
     await bot.answerCallbackQuery(query.id, { text: '無效操作' });
     return;
   }
 
-  const newStatus = ACTION_STATUS_MAP[action];
+  // ── Phase 1.9: action:<action>:<lead_id> ─────────────────────────────────
+  if (namespace === 'action') {
+    if (!ACTION_STATUS_MAP[action]) {
+      console.warn(`[telegram-bot] Unknown action '${action}'`);
+      await bot.answerCallbackQuery(query.id, { text: '無效操作' });
+      return;
+    }
 
-  try {
-    // 1. Update lead status in Postgres
-    await updateLeadStatus(leadId, newStatus);
+    const newStatus = ACTION_STATUS_MAP[action];
 
-    // 2. Answer callback (removes loading spinner from button)
-    await bot.answerCallbackQuery(query.id, { text: '已更新 ✓' });
+    try {
+      await updateLeadStatus(leadId, newStatus);
+      await bot.answerCallbackQuery(query.id, { text: '已更新 ✓' });
 
-    // 3. Edit the original message to remove keyboard and add status note
-    const confirmText = ACTION_CONFIRM_MSG[action];
-    await bot.editMessageReplyMarkup(
-      { inline_keyboard: [] },
-      { chat_id: chatId, message_id: messageId }
-    ).catch(() => {});
+      await bot.editMessageReplyMarkup(
+        { inline_keyboard: [] },
+        { chat_id: chatId, message_id: messageId }
+      ).catch(() => {});
 
-    // 4. Send confirmation reply
-    await bot.sendMessage(chatId, confirmText, {
-      parse_mode: 'MarkdownV2',
-      reply_to_message_id: messageId,
-    });
+      await bot.sendMessage(chatId, ACTION_CONFIRM_MSG[action], {
+        parse_mode: 'MarkdownV2',
+        reply_to_message_id: messageId,
+      });
 
-    // 5. Log to agent_logs
-    await logAgentAction({
-      action: 'decision_received',
-      entityId: leadId,
-      status: 'success',
-      outputSummary: `action=${action} new_status=${newStatus}`,
-    });
+      // If user chose to quote, push to queue:quote for Phase 2.2
+      if (action === 'quote') {
+        await redis.rpush('queue:quote', String(leadId));
+        console.log(`[telegram-bot] Lead ${leadId} pushed to queue:quote`);
+      }
 
-    console.log(`[telegram-bot] Lead ${leadId}: ${action} → ${newStatus}`);
-  } catch (err) {
-    console.error(`[telegram-bot] Error handling callback for lead ${leadId}:`, err.message);
-    await bot.answerCallbackQuery(query.id, { text: '操作失敗，請稍後重試' }).catch(() => {});
-    await logAgentAction({
-      action: 'decision_received',
-      entityId: leadId,
-      status: 'failed',
-      errorMessage: err.message,
-    }).catch(() => {});
+      await logAgentAction({
+        action: 'decision_received',
+        entityId: leadId,
+        status: 'success',
+        outputSummary: `action=${action} new_status=${newStatus}`,
+      });
+
+      console.log(`[telegram-bot] Lead ${leadId}: ${action} → ${newStatus}`);
+    } catch (err) {
+      console.error(`[telegram-bot] Error handling action callback for lead ${leadId}:`, err.message);
+      await bot.answerCallbackQuery(query.id, { text: '操作失敗，請稍後重試' }).catch(() => {});
+      await logAgentAction({
+        action: 'decision_received',
+        entityId: leadId,
+        status: 'failed',
+        errorMessage: err.message,
+      }).catch(() => {});
+    }
+    return;
   }
+
+  // ── Phase 2.2: quote:<action>:<lead_id> ──────────────────────────────────
+  if (namespace === 'quote') {
+    // Resolve quotation_id from Redis session
+    const sessionKey = `telegram:quote:session:${chatId}:msg:${messageId}`;
+    let quotationId = null;
+    try {
+      const sessionJson = await redis.get(sessionKey);
+      if (sessionJson) {
+        const session = JSON.parse(sessionJson);
+        quotationId = session.quotation_id;
+      }
+    } catch (err) {
+      console.warn(`[telegram-bot] Could not read quote session for msg ${messageId}:`, err.message);
+    }
+
+    if (action === 'confirm') {
+      try {
+        // 1. Remove keyboard so it can't be double-clicked
+        await bot.editMessageReplyMarkup(
+          { inline_keyboard: [] },
+          { chat_id: chatId, message_id: messageId }
+        ).catch(() => {});
+
+        // 2. Update lead status → quoted
+        await updateLeadStatus(leadId, 'quoted');
+
+        // 3. Approve quotation record (mark approved_at, copy draft → final)
+        if (quotationId) {
+          await approveQuotation(quotationId);
+        }
+
+        // 4. Answer callback
+        await bot.answerCallbackQuery(query.id, { text: '報價已確認 ✓' });
+
+        // 5. Send confirmation
+        await bot.sendMessage(
+          chatId,
+          `✅ *報價已確認*\n案件 \\#${escMd(String(leadId))} 狀態已更新為 *quoted*\\.\n草稿已存入報價記錄\\.\n⚠️ 請記得手動將報價信發送給客戶\\.`,
+          {
+            parse_mode: 'MarkdownV2',
+            reply_to_message_id: messageId,
+          }
+        );
+
+        await logAgentAction({
+          action: 'quote_confirmed',
+          entityId: leadId,
+          status: 'success',
+          outputSummary: `quotation_id=${quotationId}`,
+        });
+
+        console.log(`[telegram-bot] Lead ${leadId}: quote confirmed → quoted (quotation ${quotationId})`);
+      } catch (err) {
+        console.error(`[telegram-bot] Error confirming quote for lead ${leadId}:`, err.message);
+        await bot.answerCallbackQuery(query.id, { text: '操作失敗，請稍後重試' }).catch(() => {});
+        await logAgentAction({
+          action: 'quote_confirmed',
+          entityId: leadId,
+          status: 'failed',
+          errorMessage: err.message,
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    if (action === 'revise') {
+      // No status change — just prompt user to copy and edit the draft
+      try {
+        await bot.answerCallbackQuery(query.id, { text: '請複製草稿後修改' });
+        await bot.sendMessage(
+          chatId,
+          `✏️ *修改草稿*\n\n請從上方訊息複製草稿內容，修改後請再按 *確認送出*\\.\n\n如需重新生成草稿，請忽略此訊息並聯絡系統管理員\\.`,
+          {
+            parse_mode: 'MarkdownV2',
+            reply_to_message_id: messageId,
+          }
+        );
+      } catch (err) {
+        console.error(`[telegram-bot] Error handling quote revise for lead ${leadId}:`, err.message);
+        await bot.answerCallbackQuery(query.id, { text: '操作失敗' }).catch(() => {});
+      }
+      return;
+    }
+
+    if (action === 'cancel') {
+      try {
+        await bot.editMessageReplyMarkup(
+          { inline_keyboard: [] },
+          { chat_id: chatId, message_id: messageId }
+        ).catch(() => {});
+
+        await updateLeadStatus(leadId, 'rejected');
+        await bot.answerCallbackQuery(query.id, { text: '已取消報價 ✓' });
+
+        await bot.sendMessage(
+          chatId,
+          `❌ *報價已取消*\n案件 \\#${escMd(String(leadId))} 狀態已更新為 *rejected*\\.`,
+          {
+            parse_mode: 'MarkdownV2',
+            reply_to_message_id: messageId,
+          }
+        );
+
+        await logAgentAction({
+          action: 'quote_cancelled',
+          entityId: leadId,
+          status: 'success',
+          outputSummary: `quotation_id=${quotationId}`,
+        });
+
+        console.log(`[telegram-bot] Lead ${leadId}: quote cancelled → rejected`);
+      } catch (err) {
+        console.error(`[telegram-bot] Error cancelling quote for lead ${leadId}:`, err.message);
+        await bot.answerCallbackQuery(query.id, { text: '操作失敗，請稍後重試' }).catch(() => {});
+        await logAgentAction({
+          action: 'quote_cancelled',
+          entityId: leadId,
+          status: 'failed',
+          errorMessage: err.message,
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    console.warn(`[telegram-bot] Unknown quote action '${action}'`);
+    await bot.answerCallbackQuery(query.id, { text: '無效操作' });
+    return;
+  }
+
+  console.warn(`[telegram-bot] Unknown callback namespace '${namespace}' in: ${data}`);
+  await bot.answerCallbackQuery(query.id, { text: '無效操作' });
 });
 
 // ─── Express health endpoint ──────────────────────────────────────────────────
@@ -292,9 +577,10 @@ async function start() {
     process.exit(1);
   }
 
-  // Start queue poller
+  // Start queue pollers
   setInterval(pollNotifyQueue, POLL_INTERVAL_MS);
-  console.log(`[telegram-bot] Queue poller started (interval ${POLL_INTERVAL_MS}ms)`);
+  setInterval(pollQuoteQueue,  POLL_INTERVAL_MS);
+  console.log(`[telegram-bot] Queue pollers started (interval ${POLL_INTERVAL_MS}ms)`);
 
   // Start HTTP server
   app.listen(PORT, () => {

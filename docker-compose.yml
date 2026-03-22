@@ -177,6 +177,50 @@ services:
       ollama:
         condition: service_started
 
+  # ─── Project Bootstrapper ────────────────────────────────────
+  bootstrapper:
+    build:
+      context: ./services/bootstrapper
+      dockerfile: Dockerfile
+    container_name: agency-bootstrapper
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - PROJECTS_ROOT=/projects
+    volumes:
+      - ./projects:/projects
+    networks:
+      - agency-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─── Dev Agent Dispatcher ─────────────────────────────────────
+  dev-dispatcher:
+    build:
+      context: ./services/dev-dispatcher
+      dockerfile: Dockerfile
+    container_name: agency-dev-dispatcher
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=production
+      - PORT=3006
+      - DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - PROJECTS_ROOT=/projects
+    volumes:
+      - ./projects:/projects
+    networks:
+      - agency-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # ─── Kanban Dashboard ─────────────────────────────────────────
   dashboard:
     build:

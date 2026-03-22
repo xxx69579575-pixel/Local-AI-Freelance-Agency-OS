@@ -76,4 +76,61 @@ function buildLeadKeyboard(leadId) {
   };
 }
 
-module.exports = { escMd, formatLeadMessage, buildLeadKeyboard };
+/**
+ * Format an AI-generated quote draft for Telegram MarkdownV2 display.
+ * @param {Object} draft - { subject, body, price_estimate, timeline_estimate, notes }
+ * @param {Object} lead  - { id, title, source }
+ * @returns {string} MarkdownV2 formatted message
+ */
+function formatQuoteDraft(draft, lead) {
+  const title    = escMd(lead.title  || '（無標題）');
+  const source   = escMd(lead.source || '—');
+  const subject  = escMd(draft.subject           || '—');
+  const price    = escMd(draft.price_estimate    || '—');
+  const timeline = escMd(draft.timeline_estimate || '—');
+  const notes    = escMd(draft.notes             || '');
+
+  // body may be long — escape it in full
+  const body = escMd(draft.body || '（無草稿）');
+
+  const lines = [
+    `✉️ *報價草稿審核*`,
+    ``,
+    `📌 案件：${title}  \\(${source}\\)`,
+    ``,
+    `📧 *主旨：*${subject}`,
+    `💰 *報價：*${price}`,
+    `📅 *時程：*${timeline}`,
+    ``,
+    `📝 *信件正文：*`,
+    body,
+  ];
+
+  if (notes) {
+    lines.push(``);
+    lines.push(`🗒 *備註：*${notes}`);
+  }
+
+  lines.push(``);
+  lines.push(`\\-\\-\\-`);
+  lines.push(`請審核草稿後選擇操作：`);
+
+  return lines.join('\n');
+}
+
+/**
+ * Build the inline keyboard for a quote draft review.
+ * @param {number} leadId
+ * @returns {Object} Telegram InlineKeyboardMarkup
+ */
+function buildQuoteKeyboard(leadId) {
+  return {
+    inline_keyboard: [[
+      { text: '✅ 確認送出', callback_data: `quote:confirm:${leadId}` },
+      { text: '✏️ 修改草稿', callback_data: `quote:revise:${leadId}` },
+      { text: '❌ 取消',     callback_data: `quote:cancel:${leadId}` },
+    ]],
+  };
+}
+
+module.exports = { escMd, formatLeadMessage, buildLeadKeyboard, formatQuoteDraft, buildQuoteKeyboard };

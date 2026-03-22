@@ -1,6 +1,6 @@
 # Local AI Freelance Agency OS — 開發路線圖
 
-> **進度摘要：10 / 28 里程碑完成**
+> **進度摘要：15 / 28 里程碑完成**
 > 最後更新：2026-03-22
 
 ---
@@ -26,11 +26,11 @@
 
 **目標**：AI 草擬報價、人工審核、成案後自動建立專案資料夾。
 
-- [ ] **2.1** 實作 Quotation Assistant（Ollama 生成報價草稿）
-- [ ] **2.2** Telegram 發送草稿 + 人工核准流程
-- [ ] **2.3** 實作 Project Bootstrapper：成案後自動建立 `/projects/{id}-{slug}/`
-- [ ] **2.4** 自動產生專案文件：`README.md`、`brief.md`、`scope.md`、`todo.md`、`client-log.md`
-- [ ] **2.5** 建立「交付任務」並發送給 Claude Code / Codex
+- [x] **2.1** 實作 Quotation Assistant（Ollama 生成報價草稿）
+- [x] **2.2** Telegram 發送草稿 + 人工核准流程
+- [x] **2.3** 實作 Project Bootstrapper：成案後自動建立 `/projects/{id}-{slug}/`
+- [x] **2.4** 自動產生專案文件：`README.md`、`brief.md`、`scope.md`、`todo.md`、`client-log.md`
+- [x] **2.5** 建立「交付任務」並發送給 Claude Code / Codex
 
 ---
 
