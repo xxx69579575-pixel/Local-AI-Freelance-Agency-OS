@@ -153,7 +153,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO leads (\n  external_id, source, url, title, description,\n  budget_raw, tech_stack, status\n) VALUES (\n  '{{ $json.external_id }}',\n  '{{ $json.source }}',\n  '{{ $json.url }}',\n  '{{ $json.title }}',\n  '{{ $json.description }}',\n  '{{ $json.budget_raw }}',\n  ARRAY[{{ $json.tech_stack ? $json.tech_stack.map(t => `'${t}'`).join(',') : '' }}]::TEXT[],\n  'new'\n)\nON CONFLICT (source, external_id)\nWHERE external_id IS NOT NULL\nDO NOTHING\nRETURNING id, external_id, source, title, description, budget_raw, tech_stack",
+        "query": "INSERT INTO leads (\n  external_id, source, url, title, description,\n  budget_raw, tech_stack, status\n) VALUES (\n  '{{ $json.external_id }}',\n  '{{ $json.source }}',\n  '{{ $json.url }}',\n  '{{ $json.title }}',\n  '{{ $json.description }}',\n  '{{ $json.budget_raw }}',\n  ARRAY[{{ $json.tech_stack ? $json.tech_stack.map(t => `'${t}'`).join(',') : '' }}]::TEXT[],\n  'new'\n)\nON CONFLICT (source, external_id)\nWHERE external_id IS NOT NULL\nDO NOTHING",
         "options": {}
       },
       "id": "node-wf01-08",
@@ -256,6 +256,24 @@
       }
     },
     {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, external_id, source, title, description, budget_raw, tech_stack\nFROM leads\nWHERE source = '{{ $('IF - Is New Lead').item.json.source }}'\nAND external_id = '{{ $('IF - Is New Lead').item.json.external_id }}'",
+        "options": {}
+      },
+      "id": "node-wf01-08c",
+      "name": "Postgres - Fetch Inserted Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2000, 64],
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Agency Postgres"
+        }
+      }
+    },
+    {
       "parameters": {},
       "id": "node-wf01-skip",
       "name": "NoOp - Skip Duplicate",
@@ -321,6 +339,11 @@
       ]
     },
     "Postgres - Insert Lead": {
+      "main": [
+        [{ "node": "Postgres - Fetch Inserted Lead", "type": "main", "index": 0 }]
+      ]
+    },
+    "Postgres - Fetch Inserted Lead": {
       "main": [
         [{ "node": "HTTP - Score Lead", "type": "main", "index": 0 }]
       ]
