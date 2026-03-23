@@ -1,0 +1,13 @@
+You have a plan file at .dispatch/tasks/phase51-anti-detect/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] -> [x] with an optional note), and move to the next.
+If you need to ask the user a question, write it to .dispatch/tasks/phase51-anti-detect/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase51-anti-detect/context.md, mark the item [?] with the question, and stop.
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase51-anti-detect/ipc/.done
+
+Context:
+Phase 5.1 -- 防爬蟲偵測強化。
+先讀 services/scraper/ 了解現有 Playwright 實作。
+User-Agent 輪換：每次 browser launch 前隨機選一個 UA（20+ 個真實 UA）。
+請求節奏：每個頁面導航前 await randomDelay(2000, 5000)（均勻分布隨機 jitter）。
+Stealth：設定 args: ['--disable-blink-features=AutomationControlled']，並在 page 上 evaluate 移除 navigator.webdriver。
+不引入外部 stealth 套件，純手工實作。

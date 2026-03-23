@@ -72,7 +72,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse the Redis LRANGE response — value may be comma-separated or single id\n// Redis node returns { value: '42,57,61' } or individual items\nconst raw = String($json.value || '');\nconst ids = raw.split(',').map(s => s.trim()).filter(Boolean);\nreturn ids.map(id => ({ json: { lead_id: parseInt(id, 10) } }));"
+        "jsCode": "const leadId = parseInt(String($json.value || ''), 10);\nif (!leadId || isNaN(leadId)) return [];\nreturn [{ json: { lead_id: leadId } }];"
       },
       "id": "node-wf02-04",
       "name": "Code - Parse Lead IDs",
@@ -256,7 +256,7 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "saveManualExecutions": true,

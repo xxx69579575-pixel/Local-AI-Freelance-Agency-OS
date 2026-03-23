@@ -1,0 +1,18 @@
+You have a plan file at .dispatch/tasks/phase44-paperclip/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase44-paperclip/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase44-paperclip/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase44-paperclip/ipc/.done — then your work is done.
+
+Context:
+實作 Phase 4.4 — Paperclip Agent 任務治理層整合。
+先讀 services/dev-dispatcher/server.js、services/revision-manager/server.js、services/dashboard/ 了解現有架構。
+Paperclip 是本系統自建的輕量 task registry 微服務（不依賴外部 Paperclip SaaS）。
+tasks 表欄位建議：id、project_id、agent_name、action、status、payload(JSONB)、created_at、updated_at。
+狀態機：created → dispatched → running → completed | failed | cancelled。
+PAPERCLIP_URL 環境變數供其他服務參考（預設 http://paperclip:3008）。
+新服務加進 docker-compose.yml。
+dashboard 的 TaskGovernancePanel 需支援手動 cancel（PATCH /task/:id/status）與 retry（重新呼叫 dev-dispatcher）。

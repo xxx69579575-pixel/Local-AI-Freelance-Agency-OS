@@ -1,0 +1,21 @@
+You have a plan file at .dispatch/tasks/phase42-approval-queue/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase42-approval-queue/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase42-approval-queue/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase42-approval-queue/ipc/.done — then your work is done.
+
+Context:
+實作 Phase 4.2 — Human Approval Queue。
+先讀 services/dashboard/ 與 docs/db-schema.md（或 db/migrations/）了解 schema。
+待確認項目來源：
+  1. quotations WHERE status='pending_approval'
+  2. agent_logs WHERE action='dispatch' AND status='success'（表示 agent 已執行，等人確認）
+  3. projects WHERE status='pending_review'
+「確認」動作：
+  - quotation → PATCH /api/quotations/:id/approve（status='approved'）
+  - project review → PATCH /api/projects/:id/review（status='in_progress'）
+「拒絕/修改」動作 → 觸發 revision-manager。
+UI 顯示優先序：quotation > project_review > agent_dispatch。

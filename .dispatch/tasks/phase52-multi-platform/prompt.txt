@@ -1,0 +1,14 @@
+You have a plan file at .dispatch/tasks/phase52-multi-platform/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] -> [x] with an optional note), and move to the next.
+If you need to ask the user a question, write it to .dispatch/tasks/phase52-multi-platform/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase52-multi-platform/context.md, mark the item [?] with the question, and stop.
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase52-multi-platform/ipc/.done
+
+Context:
+Phase 5.2 -- 多平台擴充。
+先讀 services/scraper/ 了解現有 PRO360 scraper 結構（每個 scraper 應 export async function scrape() 回傳 leads[]）。
+leads 格式：{ title, description, budget, url, platform, scraped_at }。
+104 外包網：抓取 https://www.104.com.tw/jobs/search/?jobsource=outside 類公開列表（無需登入）。
+Freelancer.com：https://www.freelancer.com/jobs/ 公開列表。
+僅抓標題、描述摘要、預算（若有）、URL，不做任何登入操作。
+scraper index.js 統一呼叫所有平台，合併去重（以 url 為 key）。

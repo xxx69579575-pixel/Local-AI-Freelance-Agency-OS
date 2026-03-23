@@ -1,0 +1,13 @@
+You have a plan file at .dispatch/tasks/phase54-sla-tracking/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] -> [x] with an optional note), and move to the next.
+If you need to ask the user a question, write it to .dispatch/tasks/phase54-sla-tracking/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase54-sla-tracking/context.md, mark the item [?] with the question, and stop.
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase54-sla-tracking/ipc/.done
+
+Context:
+Phase 5.4 -- SLA 追蹤與版本管理。
+先讀 db/migrations/ 了解現有 migration 編號，新 migration 用 002_sla_tracking.sql。
+projects 表 ALTER：加 due_date TIMESTAMPTZ、sla_hours INTEGER DEFAULT 72、version VARCHAR(20) DEFAULT '1.0.0'。
+Kanban 警示：GET /api/sla-status 回傳即將逾期（<48h）與已逾期專案。
+前端：kanban.html 卡片若在 sla-warning 列表中，加 CSS class sla-warning（橙色左邊框）。
+Telegram：services/telegram-bot/sla-checker.js，setInterval 每小時掃，用 last_notified_date（process memory 即可）防重複，每日彙整一次通知。

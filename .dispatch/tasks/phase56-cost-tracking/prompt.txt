@@ -1,0 +1,14 @@
+You have a plan file at .dispatch/tasks/phase56-cost-tracking/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] -> [x] with an optional note), and move to the next.
+If you need to ask the user a question, write it to .dispatch/tasks/phase56-cost-tracking/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase56-cost-tracking/context.md, mark the item [?] with the question, and stop.
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase56-cost-tracking/ipc/.done
+
+Context:
+Phase 5.6 -- 成本追蹤（Ollama token / API 費用）。
+先讀 services/scorer/ 了解 Ollama API 呼叫格式（回應中含 eval_count / prompt_eval_count）。
+cost_logs migration 編號：004_cost_tracking.sql。
+欄位：id、service VARCHAR、model VARCHAR、prompt_tokens INT、completion_tokens INT、cost_usd NUMERIC(10,6) DEFAULT 0、created_at。
+Ollama 本地 cost_usd = 0；寫入為 fire-and-forget，不阻斷主流程。
+GET /api/cost-summary 回傳：{ total_tokens, total_cost_usd, by_service: [...], by_day: [...] }。
+dashboard kanban.html KPI 區塊（fetchKpi 函數中）加入成本摘要：呼叫 /api/cost-summary，在 KPI 卡片列加「本月 tokens: N」卡片。

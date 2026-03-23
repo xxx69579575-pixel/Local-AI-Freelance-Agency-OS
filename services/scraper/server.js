@@ -21,7 +21,10 @@ app.get('/health', (_req, res) => {
 // POST /scrape
 // Body: { source, limit?, delay_min_ms?, delay_max_ms? }
 app.post('/scrape', async (req, res) => {
-  const { source, limit = 20, delay_min_ms = 2000, delay_max_ms = 5000 } = req.body;
+  const { source } = req.body;
+  const limit       = parseInt(req.body.limit,         10) || 20;
+  const delay_min_ms = parseInt(req.body.delay_min_ms, 10) || 2000;
+  const delay_max_ms = parseInt(req.body.delay_max_ms, 10) || 5000;
 
   if (!source) {
     return res.status(400).json({ error: '`source` is required' });
@@ -40,13 +43,16 @@ app.post('/scrape', async (req, res) => {
       headless: true,
       args: ['--disable-blink-features=AutomationControlled'],
     });
-    const results = await scraperModule.scrape(browser, limit, { delay_min_ms, delay_max_ms });
-    return res.json({ source, count: results.length, results });
+    const leads = await scraperModule.scrape(browser, limit, { delay_min_ms, delay_max_ms });
+    return res.json({ success: true, source, count: leads.length, leads });
   } catch (err) {
     console.error(`[scraper] Error running ${source}:`, err.message);
     return res.status(500).json({ error: err.message });
   } finally {
-    if (browser) await browser.close();
+    if (browser) await Promise.race([
+      browser.close(),
+      new Promise(resolve => setTimeout(resolve, 5000)),
+    ]).catch(() => {});
   }
 });
 
@@ -55,12 +61,10 @@ app.post('/scrape', async (req, res) => {
 // Runs all available scrapers (or the subset named in `sources`),
 // merges results and deduplicates by URL.
 app.post('/scrape-all', async (req, res) => {
-  const {
-    limitPerSource = 20,
-    delay_min_ms = 2000,
-    delay_max_ms = 5000,
-    sources,
-  } = req.body || {};
+  const { sources } = req.body || {};
+  const limitPerSource = parseInt((req.body || {}).limitPerSource, 10) || 20;
+  const delay_min_ms   = parseInt((req.body || {}).delay_min_ms,   10) || 2000;
+  const delay_max_ms   = parseInt((req.body || {}).delay_max_ms,   10) || 5000;
 
   let browser;
   try {
@@ -74,7 +78,10 @@ app.post('/scrape-all', async (req, res) => {
     console.error('[scraper] Error in /scrape-all:', err.message);
     return res.status(500).json({ error: err.message });
   } finally {
-    if (browser) await browser.close();
+    if (browser) await Promise.race([
+      browser.close(),
+      new Promise(resolve => setTimeout(resolve, 5000)),
+    ]).catch(() => {});
   }
 });
 

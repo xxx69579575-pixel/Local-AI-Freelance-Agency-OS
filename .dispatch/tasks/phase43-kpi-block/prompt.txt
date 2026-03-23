@@ -1,0 +1,19 @@
+You have a plan file at .dispatch/tasks/phase43-kpi-block/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase43-kpi-block/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase43-kpi-block/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase43-kpi-block/ipc/.done — then your work is done.
+
+Context:
+實作 Phase 4.3 — KPI 區塊。
+先讀 services/dashboard/ 了解結構。
+KPI 指標 SQL 查詢：
+  - 新案件數：SELECT COUNT(*) FROM leads WHERE created_at >= NOW()-INTERVAL '30 days'
+  - AI推薦數：SELECT COUNT(*) FROM leads WHERE fit_score >= 7
+  - 報價數：SELECT COUNT(*) FROM quotations WHERE created_at >= NOW()-INTERVAL '30 days'
+  - 成交數：SELECT COUNT(*) FROM projects WHERE status NOT IN ('cancelled')
+  - 轉換率：成交數/報價數（百分比，0 除法保護）
+前端 KpiBlock 輕量卡片即可，不需圖表。

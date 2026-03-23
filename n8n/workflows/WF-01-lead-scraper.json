@@ -20,7 +20,7 @@
       "name": "Schedule - Every Hour",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [240, 300]
+      "position": [240, 304]
     },
     {
       "parameters": {
@@ -30,7 +30,7 @@
       "name": "Set Sources",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [460, 300]
+      "position": [464, 304]
     },
     {
       "parameters": {
@@ -51,23 +51,18 @@
             { "name": "source", "value": "={{ $json.source }}" },
             { "name": "limit", "value": "20" },
             { "name": "delay_min_ms", "value": "3000" },
-            { "name": "delay_max_ms", "value": "10000" }
+            { "name": "delay_max_ms", "value": "6000" }
           ]
         },
         "options": {
-          "timeout": 60000,
-          "retry": {
-            "enabled": true,
-            "maxTries": 3,
-            "waitBetweenTries": 30000
-          }
+          "timeout": 600000
         }
       },
       "id": "node-wf01-03",
       "name": "HTTP - Scrape Source",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [680, 300]
+      "position": [688, 304]
     },
     {
       "parameters": {
@@ -80,11 +75,11 @@
           "conditions": [
             {
               "id": "cond-scrape-success",
-              "leftValue": "={{ $json.success }}",
-              "rightValue": true,
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
               "operator": {
-                "type": "boolean",
-                "operation": "equals"
+                "type": "number",
+                "operation": "larger"
               }
             }
           ],
@@ -96,17 +91,17 @@
       "name": "IF - Scrape Success",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [900, 300]
+      "position": [912, 304]
     },
     {
       "parameters": {
-        "jsCode": "// Flatten leads array — add source to each lead item\nconst source = $json.source;\nconst leads = $json.leads || [];\nreturn leads.map(lead => ({\n  json: { ...lead, source }\n}));"
+        "jsCode": "// Flatten leads array — handle both direct and body-wrapped response\nconst data = $json.body || $json;\nconst source = data.source || $json.source;\nconst leads = data.leads || data.results || [];\nreturn leads.map(lead => ({\n  json: { ...lead, source }\n}));"
       },
       "id": "node-wf01-05",
       "name": "Expand Leads",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1120, 180]
+      "position": [1120, 192]
     },
     {
       "parameters": {
@@ -118,7 +113,7 @@
       "name": "Postgres - Check Duplicate",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [1340, 180],
+      "position": [1344, 192],
       "credentials": {
         "postgres": {
           "id": "POSTGRES_CREDENTIAL_ID",
@@ -153,7 +148,7 @@
       "name": "IF - Is New Lead",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1560, 180]
+      "position": [1568, 192]
     },
     {
       "parameters": {
@@ -165,7 +160,7 @@
       "name": "Postgres - Insert Lead",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [1780, 60],
+      "position": [1792, 64],
       "credentials": {
         "postgres": {
           "id": "POSTGRES_CREDENTIAL_ID",
@@ -183,7 +178,7 @@
       "name": "Postgres - Log Insert Success",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [2000, 60],
+      "position": [2000, 64],
       "credentials": {
         "postgres": {
           "id": "POSTGRES_CREDENTIAL_ID",
@@ -194,7 +189,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://scorer:3002/score",
+        "url": "http://agency-ollama-scorer:3002/score",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -222,19 +217,19 @@
       "name": "HTTP - Score Lead",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [2220, 60]
+      "position": [2224, 64]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE leads SET\n  status = 'pending_decision',\n  budget_estimate = '{{ $json.budget_estimate }}',\n  risk_score = {{ $json.risk_score }},\n  fit_score = {{ $json.fit_score }},\n  expected_profit_score = {{ $json.expected_profit_score }},\n  recommended_action = '{{ $json.recommended_action }}',\n  reason_summary = '{{ $json.reason_summary }}',\n  ollama_model = '{{ $json.model }}',\n  scored_at = NOW(),\n  status_updated_at = NOW()\nWHERE id = {{ $json.lead_id }}\nRETURNING id",
+        "query": "UPDATE leads SET\n  status = 'pending_decision',\n  budget_estimate = '{{ $json.budget_estimate }}',\n  risk_score = {{ $json.risk_score }},\n  fit_score = {{ $json.fit_score }},\n  expected_profit_score = {{ $json.expected_profit_score }},\n  recommended_action = '{{ $json.recommended_action }}',\n  reason_summary = '{{ $json.reason_summary }}',\n  ollama_model = '{{ $json.ollama_model }}',\n  scored_at = NOW(),\n  status_updated_at = NOW()\nWHERE id = {{ $json.lead_id }}\nRETURNING id",
         "options": {}
       },
       "id": "node-wf01-10",
       "name": "Postgres - Update Score",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [2440, 60],
+      "position": [2448, 64],
       "credentials": {
         "postgres": {
           "id": "POSTGRES_CREDENTIAL_ID",
@@ -252,7 +247,7 @@
       "name": "Redis - Push Notify Queue",
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
-      "position": [2660, 60],
+      "position": [2672, 64],
       "credentials": {
         "redis": {
           "id": "REDIS_CREDENTIAL_ID",
@@ -266,7 +261,7 @@
       "name": "NoOp - Skip Duplicate",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1780, 300]
+      "position": [1792, 304]
     },
     {
       "parameters": {
@@ -278,7 +273,7 @@
       "name": "Postgres - Log Scrape Failed",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [1120, 420],
+      "position": [1120, 432],
       "credentials": {
         "postgres": {
           "id": "POSTGRES_CREDENTIAL_ID",
@@ -327,11 +322,6 @@
     },
     "Postgres - Insert Lead": {
       "main": [
-        [{ "node": "Postgres - Log Insert Success", "type": "main", "index": 0 }]
-      ]
-    },
-    "Postgres - Log Insert Success": {
-      "main": [
         [{ "node": "HTTP - Score Lead", "type": "main", "index": 0 }]
       ]
     },
@@ -344,9 +334,14 @@
       "main": [
         [{ "node": "Redis - Push Notify Queue", "type": "main", "index": 0 }]
       ]
+    },
+    "Redis - Push Notify Queue": {
+      "main": [
+        [{ "node": "Postgres - Log Insert Success", "type": "main", "index": 0 }]
+      ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "saveManualExecutions": true,

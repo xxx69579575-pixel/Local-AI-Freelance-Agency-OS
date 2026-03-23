@@ -1,0 +1,16 @@
+You have a plan file at .dispatch/tasks/phase53-semi-auto-comm/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] -> [x] with an optional note), and move to the next.
+If you need to ask the user a question, write it to .dispatch/tasks/phase53-semi-auto-comm/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase53-semi-auto-comm/context.md, mark the item [?] with the question, and stop.
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase53-semi-auto-comm/ipc/.done
+
+Context:
+Phase 5.3 -- 半自動客戶溝通。
+先讀 services/telegram-bot/ 了解 bot 實例與指令處理方式。
+OLLAMA_URL 來自 process.env（預設 http://ollama:11434）。
+comm-assistant 新服務 port 3009，Dockerfile + package.json 參考 revision-manager。
+Telegram 指令：/reply <project_id> <message content...>
+  - 呼叫 comm-assistant POST /draft-reply { project_id, client_message }
+  - 回傳草稿 + inline keyboard（確認記錄 / 重新生成）
+確認 -> 將草稿 append 到 projects/{id}-{slug}/client-log.md（格式：時間戳 + 草稿內容）
+重要限制：不自動送出訊息給客戶，只是記錄草稿供人工使用。

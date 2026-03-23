@@ -1,0 +1,15 @@
+You have a plan file at .dispatch/tasks/phase55-crm-knowledge/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] -> [x] with an optional note), and move to the next.
+If you need to ask the user a question, write it to .dispatch/tasks/phase55-crm-knowledge/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase55-crm-knowledge/context.md, mark the item [?] with the question, and stop.
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase55-crm-knowledge/ipc/.done
+
+Context:
+Phase 5.5 -- CRM 與知識庫（過往案件學習）。
+先讀 services/scorer/、services/bootstrapper/、db/migrations/ 了解完整架構。
+knowledge_base 表（migration 003）：id、project_id FK→projects、category VARCHAR、tags TEXT[]、budget_min/max INTEGER、outcome VARCHAR(10) CHECK ('won','lost','pending')、key_factors TEXT、created_at。
+GET /suggest：用 tags @> array 查詢相似案件（pgvector 不可用），回傳最多 3 筆。
+scorer 整合：呼叫 knowledge-base GET /suggest，將相似案件摘要注入 Ollama prompt 作為 few-shot 範例。
+新服務 port 3010，結構參考 paperclip。
+dashboard knowledge-base.html：分頁瀏覽 + 標籤篩選 + outcome 統計（純 CSS 橫向 bar，不引入 chart.js）。
+Project Bootstrapper 結案（status=completed）後自動 POST /learn。

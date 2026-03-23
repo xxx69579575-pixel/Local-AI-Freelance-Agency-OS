@@ -1,0 +1,20 @@
+You have a plan file at .dispatch/tasks/phase41-runtime-status/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase41-runtime-status/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase41-runtime-status/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase41-runtime-status/ipc/.done — then your work is done.
+
+Context:
+實作 Phase 4.1 — Agent Runtime Status 面板。
+先讀 services/dashboard/ 了解現有結構（前端框架、後端路由、DB 連線方式）。
+各服務健康檢查 URL（容器內部 DNS）：
+  - n8n: http://n8n:5678/healthz
+  - Ollama: http://ollama:11434/api/tags（回傳 200 即視為 online）
+  - Telegram Bot: http://telegram-bot:3002/health
+  - Dev Dispatcher: http://dev-dispatcher:3006/health
+  - Revision Manager: http://revision-manager:3007/health
+後端 timeout 每個 ping 設 3 秒，並行發出（Promise.allSettled）。
+前端狀態顏色：online=綠、offline=紅、error=黃。

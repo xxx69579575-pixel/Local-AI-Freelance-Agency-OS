@@ -154,6 +154,7 @@ async function scrape(browser, limit, opts) {
   });
 
   const page = await context.newPage();
+  page.setDefaultTimeout(15000); // 15s max for any page operation incl. evaluate
 
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });

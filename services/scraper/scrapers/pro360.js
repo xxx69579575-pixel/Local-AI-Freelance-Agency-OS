@@ -101,37 +101,48 @@ async function scrapeSubgenre(page, subgenre, limit, [delayMin, delayMax]) {
     console.log(`[pro360] fetching ${subgenre} page ${pageNum}: ${url}`);
 
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(3000); // Wait for React to render
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      await page.waitForTimeout(1500); // Wait for React to render
+      // Guard: if no cards appear within 5s, skip this page
+      await page.waitForSelector('[class*="request_card"]', { timeout: 5000 })
+        .catch(() => console.warn(`[pro360] no cards found on ${url}, skipping`));
     } catch (err) {
       console.warn(`[pro360] failed to load ${url}: ${err.message}`);
       break;
     }
 
-    const cards = await page.evaluate((baseUrl) => {
-      const cardEls = document.querySelectorAll('[class*="request_card"]');
-      const seen = new Set();
-      const results = [];
+    const cards = await Promise.race([
+      page.evaluate((baseUrl) => {
+        const cardEls = document.querySelectorAll('[class*="request_card"]');
+        const seen = new Set();
+        const results = [];
 
-      for (const card of cardEls) {
-        // Get the case request link
-        const linkEl = card.querySelector('a[href*="/case/request/"]');
-        if (!linkEl) continue;
+        for (const card of cardEls) {
+          // Get the case request link
+          const linkEl = card.querySelector('a[href*="/case/request/"]');
+          if (!linkEl) continue;
 
-        const href = linkEl.getAttribute('href');
-        const requestUrl = href.startsWith('http') ? href : baseUrl + href;
-        if (seen.has(requestUrl)) continue;
-        seen.add(requestUrl);
+          const href = linkEl.getAttribute('href');
+          const requestUrl = href.startsWith('http') ? href : baseUrl + href;
+          if (seen.has(requestUrl)) continue;
+          seen.add(requestUrl);
 
-        // Parse card text
-        const fullText = card.innerText || '';
-        const parts = fullText.split('\n').map(s => s.trim()).filter(Boolean);
+          // Parse card text
+          const fullText = card.innerText || '';
+          const parts = fullText.split('\n').map(s => s.trim()).filter(Boolean);
 
-        results.push({ url: requestUrl, parts });
-      }
+          results.push({ url: requestUrl, parts });
+        }
 
-      return results;
-    }, BASE_URL);
+        return results;
+      }, BASE_URL),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('evaluate timeout')), 10000)
+      ),
+    ]).catch(err => {
+      console.warn(`[pro360] evaluate error on ${subgenre} page ${pageNum}: ${err.message}`);
+      return [];
+    });
 
     if (cards.length === 0) {
       console.log(`[pro360] no cards found on ${subgenre} page ${pageNum}`);
@@ -182,6 +193,7 @@ async function scrape(browser, limit, opts) {
   });
 
   const page = await context.newPage();
+  page.setDefaultTimeout(15000); // 15s max for any page operation incl. evaluate
 
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
