@@ -1,32 +1,33 @@
 'use strict';
 
 /**
- * PRO360 Public Task List Scraper
+ * PRO360 Public Case List Scraper
  *
- * Scrapes public listings from https://www.pro360.com.tw/tasklist
+ * Scrapes publicly visible case requests from
+ * https://www.pro360.com.tw/case/subgenre/<slug>
  * — no login, no authenticated pages.
  *
- * module.exports = { scrape: async function(browser, limit, opts) }
- *   browser  — Playwright Browser instance (caller manages lifecycle)
- *   limit    — maximum number of leads to return
- *   opts     — { delay_min_ms: number, delay_max_ms: number }
+ * Targets tech-relevant subgenres:
+ *   - software_development（網頁 程式類）
+ *   - it（IT相關服務類）
  *
- * Returns: Array<LeadObject> matching the leads table schema
- *   { external_id, title, url, budget_raw, deadline_raw,
- *     description, client_name, tech_stack, source }
+ * @module scrapers/pro360
  */
 
 const { getRandomUA } = require('../user-agents');
 
 const BASE_URL = 'https://www.pro360.com.tw';
-const LIST_URL = `${BASE_URL}/tasklist`;
 
-/** Common desktop viewport sizes to rotate through. */
+// Tech-relevant subgenres to scrape
+const TARGET_SUBGENRES = [
+  'software_development',
+  'it',
+];
+
 const VIEWPORTS = [
   { width: 1920, height: 1080 },
   { width: 1440, height: 900 },
   { width: 1366, height: 768 },
-  { width: 1536, height: 864 },
   { width: 1280, height: 800 },
 ];
 
@@ -34,100 +35,142 @@ function randomViewport() {
   return VIEWPORTS[Math.floor(Math.random() * VIEWPORTS.length)];
 }
 
-/**
- * Sleep for a random duration between min and max milliseconds.
- * @param {number} min
- * @param {number} max
- */
 function randomDelay(min, max) {
   const ms = Math.floor(Math.random() * (max - min + 1)) + min;
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
- * Extract the numeric task ID from a PRO360 task URL.
- * e.g. /task/12345  →  '12345'
- * @param {string} href
- * @returns {string|null}
+ * Extract external ID from a /case/request/<id> URL.
+ * @param {string} url
+ * @returns {string}
  */
-function extractExternalId(href) {
-  const m = href && href.match(/\/task\/(\d+)/);
-  return m ? m[1] : null;
+function extractExternalId(url) {
+  const m = url && url.match(/\/case\/request\/(\d+)/);
+  return m ? `pro360-${m[1]}` : `pro360-${Date.now()}`;
 }
 
 /**
- * Scrape a single task detail page and return enriched lead fields.
- * Returns null on error so the caller can skip gracefully.
- *
- * @param {import('playwright').Page} page
- * @param {string} detailUrl
- * @returns {Promise<object|null>}
+ * Parse a card's text parts into structured fields.
+ * Card text format (newline-separated):
+ *   title, client_name, location, description/details, time, ...
  */
-async function scrapeDetailPage(page, detailUrl) {
-  try {
-    await page.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+function parseCardText(parts) {
+  const title = parts[0] || '';
+  const client_name = parts[1] || null;
 
-    // PRO360 renders server-side HTML — selectors may need adjustment
-    // if the site changes layout. Using broad fallbacks throughout.
-
-    const title = await page
-      .$eval('h1.task-title, h1, .task-detail__title', (el) => el.innerText.trim())
-      .catch(() => '');
-
-    const description = await page
-      .$eval(
-        '.task-detail__description, .task-description, [class*="description"]',
-        (el) => el.innerText.trim()
-      )
-      .catch(() => '');
-
-    const budget_raw = await page
-      .$eval(
-        '.task-detail__budget, [class*="budget"], .price, [class*="price"]',
-        (el) => el.innerText.trim()
-      )
-      .catch(() => '');
-
-    const deadline_raw = await page
-      .$eval(
-        '.task-detail__deadline, [class*="deadline"], [class*="expire"], [class*="date"]',
-        (el) => el.innerText.trim()
-      )
-      .catch(() => '');
-
-    const client_name = await page
-      .$eval(
-        '.task-detail__client, [class*="client"], .employer-name, [class*="employer"]',
-        (el) => el.innerText.trim()
-      )
-      .catch(() => '');
-
-    // Tech stack — collect tag/badge elements that represent skills
-    const tech_stack = await page
-      .$$eval(
-        '.task-skills .skill, .tag, [class*="skill"], [class*="tag"]',
-        (els) => els.map((el) => el.innerText.trim()).filter(Boolean)
-      )
-      .catch(() => []);
-
-    return { title, description, budget_raw, deadline_raw, client_name, tech_stack };
-  } catch (err) {
-    console.warn(`[pro360] detail page error (${detailUrl}): ${err.message}`);
-    return null;
+  // Location: matches city patterns like "台北市 信義區" or "可遠端"
+  let location = null;
+  let descStart = 2;
+  if (parts[2] && /市|縣|區|可遠端|遠端/.test(parts[2])) {
+    location = parts[2];
+    descStart = 3;
   }
+
+  // Description: collect lines until we hit "搶先接洽" or time indicators
+  const descLines = [];
+  for (let i = descStart; i < parts.length; i++) {
+    const p = parts[i];
+    if (!p || p === '搶先接洽' || p === '我要接單' || p === '找專家') break;
+    if (/\d+秒前|\d+分鐘前|\d+小時前|\d+天前|剛剛|一週前/.test(p)) break;
+    descLines.push(p);
+  }
+  const description = descLines.join(' ').trim() || null;
+
+  return { title, client_name, location, description };
 }
 
 /**
- * Scrape the PRO360 public task list.
- *
- * @param {import('playwright').Browser} browser
+ * Scrape one subgenre listing page.
+ * @param {import('playwright').Page} page
+ * @param {string} subgenre
  * @param {number} limit
- * @param {{ delay_min_ms: number, delay_max_ms: number }} opts
+ * @param {number[]} delay
  * @returns {Promise<object[]>}
+ */
+async function scrapeSubgenre(page, subgenre, limit, [delayMin, delayMax]) {
+  const results = [];
+  let pageNum = 1;
+  const maxPages = 3;
+
+  while (results.length < limit && pageNum <= maxPages) {
+    const url = pageNum === 1
+      ? `${BASE_URL}/case/subgenre/${subgenre}`
+      : `${BASE_URL}/case/subgenre/${subgenre}?page=${pageNum}`;
+
+    console.log(`[pro360] fetching ${subgenre} page ${pageNum}: ${url}`);
+
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForTimeout(3000); // Wait for React to render
+    } catch (err) {
+      console.warn(`[pro360] failed to load ${url}: ${err.message}`);
+      break;
+    }
+
+    const cards = await page.evaluate((baseUrl) => {
+      const cardEls = document.querySelectorAll('[class*="request_card"]');
+      const seen = new Set();
+      const results = [];
+
+      for (const card of cardEls) {
+        // Get the case request link
+        const linkEl = card.querySelector('a[href*="/case/request/"]');
+        if (!linkEl) continue;
+
+        const href = linkEl.getAttribute('href');
+        const requestUrl = href.startsWith('http') ? href : baseUrl + href;
+        if (seen.has(requestUrl)) continue;
+        seen.add(requestUrl);
+
+        // Parse card text
+        const fullText = card.innerText || '';
+        const parts = fullText.split('\n').map(s => s.trim()).filter(Boolean);
+
+        results.push({ url: requestUrl, parts });
+      }
+
+      return results;
+    }, BASE_URL);
+
+    if (cards.length === 0) {
+      console.log(`[pro360] no cards found on ${subgenre} page ${pageNum}`);
+      break;
+    }
+
+    for (const card of cards) {
+      if (results.length >= limit) break;
+      const { title, client_name, location, description } = parseCardText(card.parts);
+      if (!title) continue;
+
+      results.push({
+        external_id: extractExternalId(card.url),
+        source: 'pro360',
+        url: card.url,
+        title,
+        description,
+        budget_raw: null, // Not shown on listing page
+        deadline_raw: null,
+        client_name,
+        tech_stack: location ? [location] : [],
+      });
+    }
+
+    pageNum++;
+    if (results.length < limit && pageNum <= maxPages) {
+      await randomDelay(delayMin, delayMax);
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Main scrape entry point.
  */
 async function scrape(browser, limit, opts) {
   const { delay_min_ms = 2000, delay_max_ms = 5000 } = opts || {};
-  const leads = [];
+  const perSubgenre = Math.ceil(limit / TARGET_SUBGENRES.length);
 
   const context = await browser.newContext({
     userAgent: getRandomUA(),
@@ -140,91 +183,44 @@ async function scrape(browser, limit, opts) {
 
   const page = await context.newPage();
 
-  // Remove navigator.webdriver fingerprint
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
   });
 
+  const allResults = [];
+  const seen = new Set();
+
   try {
-    let pageNum = 1;
+    for (const subgenre of TARGET_SUBGENRES) {
+      if (allResults.length >= limit) break;
 
-    while (leads.length < limit) {
-      const listUrl =
-        pageNum === 1 ? LIST_URL : `${LIST_URL}?page=${pageNum}`;
+      const leads = await scrapeSubgenre(
+        page,
+        subgenre,
+        perSubgenre,
+        [delay_min_ms, delay_max_ms]
+      );
 
-      console.log(`[pro360] fetching list page ${pageNum}: ${listUrl}`);
-
-      try {
-        await page.goto(listUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      } catch (navErr) {
-        console.warn(`[pro360] failed to load list page ${pageNum}: ${navErr.message}`);
-        break;
+      for (const lead of leads) {
+        if (!seen.has(lead.url)) {
+          seen.add(lead.url);
+          allResults.push(lead);
+        }
       }
 
-      // Collect task links from the listing page
-      // PRO360 task cards typically link to /task/<id>
-      const taskLinks = await page
-        .$$eval('a[href*="/task/"]', (anchors) =>
-          [...new Set(anchors.map((a) => a.getAttribute('href')))].filter((h) =>
-            /\/task\/\d+/.test(h)
-          )
-        )
-        .catch(() => []);
-
-      if (taskLinks.length === 0) {
-        console.log(`[pro360] no task links found on page ${pageNum} — stopping pagination`);
-        break;
-      }
-
-      for (const href of taskLinks) {
-        if (leads.length >= limit) break;
-
-        const external_id = extractExternalId(href);
-        const url = href.startsWith('http') ? href : `${BASE_URL}${href}`;
-
-        // Random delay before each detail page request
+      if (TARGET_SUBGENRES.indexOf(subgenre) < TARGET_SUBGENRES.length - 1) {
         await randomDelay(delay_min_ms, delay_max_ms);
-
-        const detail = await scrapeDetailPage(page, url);
-
-        leads.push({
-          external_id,
-          source: 'pro360',
-          url,
-          title: (detail && detail.title) || '',
-          description: (detail && detail.description) || '',
-          budget_raw: (detail && detail.budget_raw) || '',
-          deadline_raw: (detail && detail.deadline_raw) || '',
-          client_name: (detail && detail.client_name) || '',
-          tech_stack: (detail && detail.tech_stack) || [],
-        });
       }
-
-      // Check if there is a next page link; stop if not
-      const hasNextPage = await page
-        .$('a[rel="next"], .pagination .next:not(.disabled), [class*="pagination"] a[href*="page=' + (pageNum + 1) + '"]')
-        .then((el) => !!el)
-        .catch(() => false);
-
-      if (!hasNextPage) {
-        console.log(`[pro360] no next page found after page ${pageNum} — done`);
-        break;
-      }
-
-      pageNum += 1;
-      // Delay between list page navigations
-      await randomDelay(delay_min_ms, delay_max_ms);
     }
   } catch (err) {
     console.error(`[pro360] unexpected error: ${err.message}`);
-    // Return whatever partial results we have
   } finally {
     await page.close().catch(() => {});
     await context.close().catch(() => {});
   }
 
-  console.log(`[pro360] scraped ${leads.length} leads (limit=${limit})`);
-  return leads;
+  console.log(`[pro360] scraped ${allResults.length} leads (limit=${limit})`);
+  return allResults.slice(0, limit);
 }
 
 module.exports = { scrape };

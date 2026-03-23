@@ -24,7 +24,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Emit one item per scraping source\nreturn [\n  { json: { source: 'pro360' } },\n  { json: { source: 'chutask' } }\n];"
+        "jsCode": "// Emit one item per scraping source\nreturn [\n  { json: { source: 'pro360' } },\n  { json: { source: 'tasker' } }\n];"
       },
       "id": "node-wf01-02",
       "name": "Set Sources",
