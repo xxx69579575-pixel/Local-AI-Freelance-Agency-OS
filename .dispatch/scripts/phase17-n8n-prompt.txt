@@ -1,0 +1,20 @@
+You have a plan file at .dispatch/tasks/phase17-n8n/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase17-n8n/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase17-n8n/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase17-n8n/ipc/.done — then your work is done.
+
+Context:
+- Working directory: C:/Users/xx/Desktop/Local-AI-Freelance-Agency-OS
+- Task: Create n8n workflow JSON exports for all 3 workflows (Phase 1.7)
+- Reference files: docs/n8n-workflow-spec.md (primary spec), docker-compose.yml (service names/ports), db/init.sql (table schema)
+- Output directory: n8n/workflows/
+- Service endpoints: scraper http://scraper:3001/scrape, scorer http://ollama-scorer:3002/score, postgres via n8n built-in credentials, redis via n8n built-in credentials, Telegram bot token via env
+- WF-01: Cron (every hour, Asia/Taipei) → Set sources [pro360, chutask] → Split → HTTP scraper POST → IF success → Postgres check duplicate → Postgres INSERT → HTTP scorer POST → Postgres UPDATE status=pending_decision, scored fields → Redis RPUSH queue:notify
+- WF-02: Interval (5min) → Postgres SELECT leads WHERE status=pending_decision → Split each → Telegram sendMessage with inline keyboard [聯絡報價, 放棄報價, 稍後處理]
+- WF-03: Webhook POST /webhook/decision → Switch on action (contact_quote, reject, later) → Postgres UPDATE leads.status accordingly
+- The JSON format must be valid n8n workflow export format (version 1.0, with nodes array and connections object)
+- Constraint: This is for local n8n running in Docker, not n8n cloud

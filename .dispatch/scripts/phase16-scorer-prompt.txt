@@ -1,0 +1,19 @@
+You have a plan file at .dispatch/tasks/phase16-scorer/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase16-scorer/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase16-scorer/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase16-scorer/ipc/.done — then your work is done.
+
+Context:
+- Working directory: C:/Users/xx/Desktop/Local-AI-Freelance-Agency-OS
+- Task: Implement services/scorer/ — Ollama-based lead scoring service (Phase 1.6)
+- Reference files: docs/PRD.md, docs/n8n-workflow-spec.md, db/init.sql, docker-compose.yml
+- Service name in Docker: ollama-scorer, port 3002
+- Ollama base URL: env OLLAMA_BASE_URL (default http://ollama:11434), model: llama3.2
+- POST /score input: { lead_id, title, description, budget_raw, tech_stack }
+- POST /score output: { risk_score(1-10), fit_score(1-10), profit_score(1-10), recommended_action, reason_summary, ollama_model }
+- The scoring prompt must force JSON output from Ollama — use a system prompt that specifies exact JSON schema
+- Constraints: local only, no external APIs, all scoring done via Ollama

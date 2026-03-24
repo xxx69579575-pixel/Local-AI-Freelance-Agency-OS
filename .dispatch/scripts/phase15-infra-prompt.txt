@@ -1,0 +1,19 @@
+You have a plan file at .dispatch/tasks/phase15-infra/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase15-infra/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase15-infra/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase15-infra/ipc/.done — then your work is done.
+
+Context:
+- Working directory: C:/Users/xx/Desktop/Local-AI-Freelance-Agency-OS
+- Task: Set up the Playwright scraper service infrastructure for Phase 1.5
+- Reference files: docker-compose.yml (must read before editing), docs/PRD.md, docs/n8n-workflow-spec.md
+- The scraper service runs on port 3001 internally (docker service name: scraper)
+- server.js POST /scrape accepts { source, limit, delay_min_ms, delay_max_ms } and calls scrapers/${source}.js scrape(browser, limit, opts)
+- Use playwright.chromium.launch({ headless: true }) in server.js; pass the browser instance to each scraper module
+- The scraper modules (pro360.js, chutask.js) will be written by other workers — just create the directory and server.js skeleton with dynamic require
+- Keep Dockerfile minimal: node:20-slim base, run npx playwright install chromium --with-deps
+- Constraints: local Docker Compose only, no Vercel, no cloud deployment

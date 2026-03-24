@@ -1,0 +1,20 @@
+You have a plan file at .dispatch/tasks/phase18-19-telegram/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase18-19-telegram/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase18-19-telegram/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase18-19-telegram/ipc/.done — then your work is done.
+
+Context:
+- Working directory: C:/Users/xx/Desktop/Local-AI-Freelance-Agency-OS
+- Task: Implement services/telegram-bot/ — Telegram Bot for lead notifications and decision handling (Phase 1.8 + 1.9)
+- Reference files: docs/PRD.md, docs/n8n-workflow-spec.md, db/init.sql, docker-compose.yml
+- Phase 1.8: sendLeadNotification — polls Redis queue:notify, fetches lead from Postgres, sends formatted message with inline keyboard [聯絡報價 (contact_quote), 放棄報價 (reject), 稍後處理 (later)]
+- Phase 1.9: callback_query handler — receives inline button press, updates leads.status in Postgres, sends confirmation reply to user
+- Bot token via env TELEGRAM_BOT_TOKEN, chat ID via env TELEGRAM_CHAT_ID
+- Message format: 繁體中文, use MarkdownV2, include: 案件標題, 來源, 預算, risk/fit/profit scores, 案件連結
+- Decision handler updates leads.status: contact_quote → pending_quote, reject → rejected, later → pending_decision (keep as-is, re-notify later)
+- Docker service name: telegram-bot, depends on postgres and redis
+- Constraints: human approval required for all actions (bot just records decision, does NOT auto-send quotes)

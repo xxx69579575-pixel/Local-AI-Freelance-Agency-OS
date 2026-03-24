@@ -1,0 +1,21 @@
+You have a plan file at .dispatch/tasks/phase15-chutask/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase15-chutask/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase15-chutask/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase15-chutask/ipc/.done — then your work is done.
+
+Context:
+- Working directory: C:/Users/xx/Desktop/Local-AI-Freelance-Agency-OS
+- Task: Implement services/scraper/scrapers/chutask.js — Playwright scraper for 出任務 public listings
+- The function signature must be: module.exports = { scrape: async function(browser, limit, opts) }
+- opts = { delay_min_ms: number, delay_max_ms: number }
+- Return value: Array of objects matching the leads table schema (external_id, title, url, budget_raw, deadline_raw, description, client_name, tech_stack, source set to chutask)
+- Research the correct public URL for chutask.com.tw public task listings
+- Only scrape public pages — do NOT attempt login or authenticated pages
+- Add random delay (between delay_min_ms and delay_max_ms) between page navigations
+- Handle pagination to collect up to limit items
+- Set a realistic User-Agent string
+- Constraint: the services/scraper/scrapers/ directory may not exist yet — create it with mkdir -p if needed

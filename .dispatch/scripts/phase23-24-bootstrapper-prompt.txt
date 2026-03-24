@@ -1,0 +1,18 @@
+You have a plan file at .dispatch/tasks/phase23-24-bootstrapper/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase23-24-bootstrapper/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase23-24-bootstrapper/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase23-24-bootstrapper/ipc/.done — then your work is done.
+
+Context:
+- Working directory: C:/Users/xx/Desktop/Local-AI-Freelance-Agency-OS
+- Task: Implement Project Bootstrapper service (Phase 2.3) and auto-generate project docs (Phase 2.4)
+- Reference files: docs/PRD.md, db/init.sql (projects table schema), docker-compose.yml
+- POST /bootstrap: { lead_id } → create /projects/{id}-{slug}/ → write 5 doc files → INSERT into projects table → return { project_id, project_path }
+- Doc files: README.md, brief.md (for Dev Agent — must include ALL lead data for Claude Code to work from), scope.md, todo.md, client-log.md
+- Project slug = sanitized title (lowercase, hyphens, max 40 chars)
+- Projects volume: ./projects mapped to /projects in container
+- Constraint: /projects/{id}-{slug}/ must be created atomically — check for existing project first (idempotent)

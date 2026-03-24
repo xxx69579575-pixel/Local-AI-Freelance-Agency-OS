@@ -20,7 +20,10 @@
       "name": "Schedule - Every Hour",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [240, 304]
+      "position": [
+        240,
+        304
+      ]
     },
     {
       "parameters": {
@@ -30,7 +33,10 @@
       "name": "Set Sources",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [464, 304]
+      "position": [
+        464,
+        304
+      ]
     },
     {
       "parameters": {
@@ -48,10 +54,22 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "source", "value": "={{ $json.source }}" },
-            { "name": "limit", "value": "20" },
-            { "name": "delay_min_ms", "value": "3000" },
-            { "name": "delay_max_ms", "value": "6000" }
+            {
+              "name": "source",
+              "value": "={{ $json.source }}"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            },
+            {
+              "name": "delay_min_ms",
+              "value": "3000"
+            },
+            {
+              "name": "delay_max_ms",
+              "value": "6000"
+            }
           ]
         },
         "options": {
@@ -62,28 +80,31 @@
       "name": "HTTP - Scrape Source",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [688, 304]
+      "position": [
+        688,
+        304
+      ]
     },
     {
       "parameters": {
         "conditions": {
           "options": {
-            "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "caseSensitive": true,
+            "typeValidation": "loose"
           },
+          "combinator": "and",
           "conditions": [
             {
               "id": "cond-scrape-success",
-              "leftValue": "={{ $json.count }}",
-              "rightValue": 0,
               "operator": {
-                "type": "number",
-                "operation": "larger"
-              }
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ String($json.success) }}",
+              "rightValue": "true"
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {}
       },
@@ -91,7 +112,10 @@
       "name": "IF - Scrape Success",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [912, 304]
+      "position": [
+        912,
+        304
+      ]
     },
     {
       "parameters": {
@@ -101,7 +125,10 @@
       "name": "Expand Leads",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1120, 192]
+      "position": [
+        1120,
+        192
+      ]
     },
     {
       "parameters": {
@@ -113,11 +140,14 @@
       "name": "Postgres - Check Duplicate",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [1344, 192],
+      "position": [
+        1344,
+        192
+      ],
       "credentials": {
         "postgres": {
-          "id": "POSTGRES_CREDENTIAL_ID",
-          "name": "Agency Postgres"
+          "id": "6BIVqwzdoEMhGo8H",
+          "name": "Postgres account"
         }
       }
     },
@@ -148,7 +178,10 @@
       "name": "IF - Is New Lead",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1568, 192]
+      "position": [
+        1568,
+        192
+      ]
     },
     {
       "parameters": {
@@ -160,29 +193,48 @@
       "name": "Postgres - Insert Lead",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [1792, 64],
+      "position": [
+        1792,
+        64
+      ],
       "credentials": {
         "postgres": {
-          "id": "POSTGRES_CREDENTIAL_ID",
-          "name": "Agency Postgres"
+          "id": "6BIVqwzdoEMhGo8H",
+          "name": "Postgres account"
         }
       }
     },
     {
       "parameters": {
+        "jsCode": "// INSERT only returns { success: true } — rebuild scoring input from Expand Leads\nconst lead = $('Expand Leads').item.json;\nreturn [{\n  json: {\n    source: lead.source,\n    external_id: lead.external_id,\n    title: lead.title,\n    description: lead.description,\n    budget_raw: lead.budget_raw,\n    tech_stack: lead.tech_stack\n  }\n}];"
+      },
+      "id": "node-wf01-08d",
+      "name": "Code - Prepare Scoring Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2092,
+        64
+      ]
+    },
+    {
+      "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO agent_logs (agent_name, action, entity_type, entity_id, status, output_summary)\nVALUES ('scraper', 'scrape_success', 'lead', {{ $json.id }}, 'success', 'New lead inserted: {{ $json.title }}')",
+        "query": "SELECT id, external_id, source, title, description, budget_raw, tech_stack\nFROM leads\nWHERE source = '{{ $json.source }}'\nAND external_id = '{{ $json.external_id }}'\nLIMIT 1",
         "options": {}
       },
-      "id": "node-wf01-08b",
-      "name": "Postgres - Log Insert Success",
+      "id": "node-wf01-08e",
+      "name": "Postgres - Get Lead ID",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [2000, 64],
+      "position": [
+        2392,
+        64
+      ],
       "credentials": {
         "postgres": {
-          "id": "POSTGRES_CREDENTIAL_ID",
-          "name": "Agency Postgres"
+          "id": "6BIVqwzdoEMhGo8H",
+          "name": "Postgres account"
         }
       }
     },
@@ -202,11 +254,26 @@
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "lead_id", "value": "={{ $json.id }}" },
-            { "name": "title", "value": "={{ $json.title }}" },
-            { "name": "description", "value": "={{ $json.description }}" },
-            { "name": "budget_raw", "value": "={{ $json.budget_raw }}" },
-            { "name": "tech_stack", "value": "={{ $json.tech_stack }}" }
+            {
+              "name": "lead_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.description }}"
+            },
+            {
+              "name": "budget_raw",
+              "value": "={{ $json.budget_raw }}"
+            },
+            {
+              "name": "tech_stack",
+              "value": "={{ $json.tech_stack }}"
+            }
           ]
         },
         "options": {
@@ -217,7 +284,10 @@
       "name": "HTTP - Score Lead",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [2224, 64]
+      "position": [
+        2616,
+        64
+      ]
     },
     {
       "parameters": {
@@ -229,11 +299,14 @@
       "name": "Postgres - Update Score",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [2448, 64],
+      "position": [
+        2840,
+        64
+      ],
       "credentials": {
         "postgres": {
-          "id": "POSTGRES_CREDENTIAL_ID",
-          "name": "Agency Postgres"
+          "id": "6BIVqwzdoEMhGo8H",
+          "name": "Postgres account"
         }
       }
     },
@@ -247,10 +320,13 @@
       "name": "Redis - Push Notify Queue",
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
-      "position": [2672, 64],
+      "position": [
+        3064,
+        64
+      ],
       "credentials": {
         "redis": {
-          "id": "REDIS_CREDENTIAL_ID",
+          "id": "AgencyRedis001",
           "name": "Agency Redis"
         }
       }
@@ -258,18 +334,21 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT id, external_id, source, title, description, budget_raw, tech_stack\nFROM leads\nWHERE source = '{{ $('IF - Is New Lead').item.json.source }}'\nAND external_id = '{{ $('IF - Is New Lead').item.json.external_id }}'",
+        "query": "INSERT INTO agent_logs (agent_name, action, entity_type, entity_id, status, output_summary)\nVALUES ('scraper', 'scrape_success', 'lead', {{ $json.id }}, 'success', 'New lead inserted: {{ $json.title }}')",
         "options": {}
       },
-      "id": "node-wf01-08c",
-      "name": "Postgres - Fetch Inserted Lead",
+      "id": "node-wf01-08b",
+      "name": "Postgres - Log Insert Success",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [2000, 64],
+      "position": [
+        3288,
+        64
+      ],
       "credentials": {
         "postgres": {
-          "id": "POSTGRES_CREDENTIAL_ID",
-          "name": "Agency Postgres"
+          "id": "6BIVqwzdoEMhGo8H",
+          "name": "Postgres account"
         }
       }
     },
@@ -279,7 +358,10 @@
       "name": "NoOp - Skip Duplicate",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1792, 304]
+      "position": [
+        1792,
+        304
+      ]
     },
     {
       "parameters": {
@@ -291,11 +373,14 @@
       "name": "Postgres - Log Scrape Failed",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.4,
-      "position": [1120, 432],
+      "position": [
+        1120,
+        432
+      ],
       "credentials": {
         "postgres": {
-          "id": "POSTGRES_CREDENTIAL_ID",
-          "name": "Agency Postgres"
+          "id": "6BIVqwzdoEMhGo8H",
+          "name": "Postgres account"
         }
       }
     }
@@ -303,64 +388,159 @@
   "connections": {
     "Schedule - Every Hour": {
       "main": [
-        [{ "node": "Set Sources", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Set Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Set Sources": {
       "main": [
-        [{ "node": "HTTP - Scrape Source", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "HTTP - Scrape Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "HTTP - Scrape Source": {
       "main": [
-        [{ "node": "IF - Scrape Success", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "IF - Scrape Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "IF - Scrape Success": {
       "main": [
-        [{ "node": "Expand Leads", "type": "main", "index": 0 }],
-        [{ "node": "Postgres - Log Scrape Failed", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Expand Leads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Postgres - Log Scrape Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Expand Leads": {
       "main": [
-        [{ "node": "Postgres - Check Duplicate", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Postgres - Check Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Postgres - Check Duplicate": {
       "main": [
-        [{ "node": "IF - Is New Lead", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "IF - Is New Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "IF - Is New Lead": {
       "main": [
-        [{ "node": "Postgres - Insert Lead", "type": "main", "index": 0 }],
-        [{ "node": "NoOp - Skip Duplicate", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Postgres - Insert Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NoOp - Skip Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Postgres - Insert Lead": {
       "main": [
-        [{ "node": "Postgres - Fetch Inserted Lead", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Code - Prepare Scoring Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Postgres - Fetch Inserted Lead": {
+    "Code - Prepare Scoring Input": {
       "main": [
-        [{ "node": "HTTP - Score Lead", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Postgres - Get Lead ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres - Get Lead ID": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Score Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "HTTP - Score Lead": {
       "main": [
-        [{ "node": "Postgres - Update Score", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Postgres - Update Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Postgres - Update Score": {
       "main": [
-        [{ "node": "Redis - Push Notify Queue", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Redis - Push Notify Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Redis - Push Notify Queue": {
       "main": [
-        [{ "node": "Postgres - Log Insert Success", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Postgres - Log Insert Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

@@ -57,7 +57,7 @@ async function fetchLead(leadId) {
     `SELECT id, title, source, url,
             budget_estimate, budget_raw, deadline, description,
             tech_stack, client_name, risk_score, fit_score,
-            expected_profit_score, reason_summary, status
+            expected_profit_score, reason_summary, status, notified_at
      FROM leads WHERE id = $1`,
     [leadId]
   );
@@ -123,6 +123,11 @@ async function sendLeadNotification(leadId) {
     return;
   }
 
+  if (lead.notified_at) {
+    console.warn(`[telegram-bot] Lead ${leadId} already notified at ${lead.notified_at} — skipping duplicate`);
+    return;
+  }
+
   const text     = formatLeadMessage(lead);
   const keyboard = buildLeadKeyboard(lead.id);
 
@@ -138,6 +143,8 @@ async function sendLeadNotification(leadId) {
       String(lead.id),
       'EX', 86400  // expires in 24 hours
     );
+
+    await db.query('UPDATE leads SET notified_at = NOW() WHERE id = $1', [lead.id]);
 
     await logAgentAction({
       action: 'notify_sent',

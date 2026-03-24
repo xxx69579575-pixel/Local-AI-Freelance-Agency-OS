@@ -1,0 +1,19 @@
+You have a plan file at .dispatch/tasks/phase21-22-quotation/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase21-22-quotation/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase21-22-quotation/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase21-22-quotation/ipc/.done — then your work is done.
+
+Context:
+- Working directory: C:/Users/xx/Desktop/Local-AI-Freelance-Agency-OS
+- Task: Implement Quotation Assistant (Phase 2.1) and Telegram draft approval flow (Phase 2.2)
+- Reference files: docs/PRD.md, db/init.sql (quotations table), services/scorer/server.js, services/scorer/prompt.js, services/telegram-bot/bot.js, services/telegram-bot/formatter.js
+- Phase 2.1: Ollama llama3.2 generates 報價草稿 — input: lead fields, output: { subject, body, price_estimate, timeline_estimate, notes } in 繁體中文
+- Phase 2.2: Telegram bot sends draft for human review with inline keyboard [確認送出, 修改草稿, 取消]. On confirm → status=quoted + INSERT quotations. On cancel → status=rejected
+- Quotations table fields from db/init.sql (read first to confirm exact schema)
+- Human approval is MANDATORY — bot NEVER auto-sends quotes
+- The scorer service already has a /quotation endpoint stub — check and complete it properly
+- Constraint: modify only services/scorer/ and services/telegram-bot/ — do not create new services

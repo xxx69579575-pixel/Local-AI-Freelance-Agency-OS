@@ -1,0 +1,19 @@
+You have a plan file at .dispatch/tasks/phase110-kanban/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase110-kanban/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase110-kanban/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase110-kanban/ipc/.done — then your work is done.
+
+Context:
+- Working directory: C:/Users/xx/Desktop/Local-AI-Freelance-Agency-OS
+- Task: Build basic Kanban dashboard service (Phase 1.10)
+- Reference files: db/init.sql (leads table status values), docs/PRD.md (Kanban status flow)
+- Status columns to show: new, scoring, pending_decision, rejected, pending_quote, quoted, negotiating, negotiation_abandoned, won, in_development, pending_review, in_revision, pending_final, closed
+- GET /api/kanban returns { status: { count, leads: [{ id, title, source, risk_score, fit_score, profit_score, scraped_at }] } }
+- GET / serves kanban.html — simple drag-free Kanban board, columns per status, auto-refresh every 30s
+- HTML: vanilla JS + inline CSS, no build step, no npm frontend, 繁體中文 column labels
+- Docker service: dashboard, port 3003, depends on postgres
+- Constraint: read-only view — no status changes via dashboard (all changes go through Telegram Bot decisions)

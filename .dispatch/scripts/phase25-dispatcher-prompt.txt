@@ -1,0 +1,17 @@
+You have a plan file at .dispatch/tasks/phase25-dispatcher/plan.md containing a checklist.
+Work through it top to bottom. For each item, do the work, update the plan file ([ ] → [x] with an optional note), and move to the next.
+
+If you need to ask the user a question, write it to .dispatch/tasks/phase25-dispatcher/ipc/<NNN>.question (atomic write via temp file + mv; sequence from 001). Poll for a matching .answer file. When you receive the answer, write a .done marker and continue. If no answer arrives within 3 minutes, write your context to .dispatch/tasks/phase25-dispatcher/context.md, mark the item [?] with the question, and stop.
+
+If you hit an unresolvable error, mark the item [!] with a description and stop.
+
+When all items are checked, write a completion marker: touch .dispatch/tasks/phase25-dispatcher/ipc/.done — then your work is done.
+
+Context:
+- Working directory: C:/Users/xx/Desktop/Local-AI-Freelance-Agency-OS
+- Task: Implement Dev Agent Dispatcher service (Phase 2.5) — reads brief.md and dispatches task to Claude Code / Codex
+- Reference files: docs/PRD.md, db/init.sql (projects + agent_logs tables), docker-compose.yml
+- POST /dispatch: { project_id } → read /projects/{id}-{slug}/brief.md → write task instruction file → log to agent_logs
+- The dispatched task file should wrap brief.md in a structured prompt that Claude Code can execute directly
+- Port 3006, depends_on postgres, volume ./projects:/projects
+- Constraint: dispatching is a human-triggered action — the service accepts the request but does NOT auto-execute. It only prepares the task file and logs the dispatch. Actual execution happens when a human runs Claude Code against the task file.
